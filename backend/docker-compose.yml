@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: guettgui_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: guettgui_db
+      POSTGRES_USER: guettgui
+      POSTGRES_PASSWORD: guettgui
+    ports:
+      - '5434:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U guettgui -d guettgui_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: guettgui_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: guettgui
+      MINIO_ROOT_PASSWORD: guettgui123
+    ports:
+      - '9002:9000'   # API S3
+      - '9003:9001'   # Console web
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: guettgui_api
+    restart: unless-stopped
+    ports:
+      - '3002:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://guettgui:guettgui@postgres:5432/guettgui_db?schema=public
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: guettgui
+      STORAGE_SECRET_KEY: guettgui123
+      STORAGE_BUCKET_NAME: guettgui
+      STORAGE_PUBLIC_URL: http://localhost:9002
+      NODE_ENV: development
+      PORT: 3000
+
+volumes:
+  postgres_data:
+  minio_data:

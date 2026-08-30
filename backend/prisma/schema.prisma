@@ -1,0 +1,647 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ════════════════════════════════════════════════════════════
+// UTILISATEURS & EQUIPES
+// ════════════════════════════════════════════════════════════
+
+model User {
+  id        String    @id @default(cuid())
+  phone     String    @unique
+  firstName String
+  lastName  String
+  avatarUrl String?
+  fcmToken  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  memberships   TeamMember[]
+  otpCodes      OtpCode[]
+  refreshTokens RefreshToken[]
+}
+
+model OtpCode {
+  id        String    @id @default(cuid())
+  userId    String?
+  phone     String
+  code      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([phone, code])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Team {
+  id       String    @id @default(cuid())
+  name     String
+  location String?
+  logoUrl  String?
+  currency String    @default("XOF")
+  inviteCode String  @unique @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  // Objectifs de production
+  targetLayingRate Float @default(70)
+  targetFertility  Float @default(85)
+  targetHatchRate  Float @default(82)
+
+  members              TeamMember[]
+  flocks               Flock[]
+  incubators           Incubator[]
+  customers            Customer[]
+  stocks               Stock[]
+  expenses             Expense[]
+  sales                Sale[]
+  orders               Order[]
+  alerts               Alert[]
+  vaccinationProtocols VaccinationProtocol[]
+  auditLogs            AuditLog[]
+}
+
+enum TeamRole {
+  OWNER
+  MEMBER
+}
+
+model TeamMember {
+  id        String    @id @default(cuid())
+  userId    String
+  teamId    String
+  role      TeamRole  @default(MEMBER)
+  joinedAt  DateTime  @default(now())
+  removedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, teamId])
+}
+
+// ════════════════════════════════════════════════════════════
+// ELEVAGE — LOTS (FLOCKS)
+// ════════════════════════════════════════════════════════════
+
+enum FlockType {
+  BREEDER
+  LAYER
+  BROILER
+  QUAIL
+}
+
+enum FlockStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+model Flock {
+  id             String      @id @default(cuid())
+  teamId         String
+  name           String
+  type           FlockType
+  breed          String?
+  status         FlockStatus @default(ACTIVE)
+  startDate      DateTime
+  endDate        DateTime?
+  initialMales   Int         @default(0)
+  initialFemales Int         @default(0)
+  initialTotal   Int         @default(0)
+  currentMales   Int         @default(0)
+  currentFemales Int         @default(0)
+  currentTotal   Int         @default(0)
+
+  // Parametres specifiques
+  targetLayingRate    Float?
+  broilerDurationDays Int?
+  incubationDays      Int?
+  expectedEndDate     DateTime?
+
+  notes     String?
+  photoUrl  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  team              Team              @relation(fields: [teamId], references: [id])
+  dailyRecords      DailyRecord[]
+  incubationBatches IncubationBatch[]
+  vaccinations      Vaccination[]
+  sales             Sale[]
+  expenses          Expense[]
+  orders            Order[]
+
+  @@index([teamId, status])
+  @@index([teamId, type])
+}
+
+// ════════════════════════════════════════════════════════════
+// SAISIE QUOTIDIENNE
+// ════════════════════════════════════════════════════════════
+
+model DailyRecord {
+  id           String   @id @default(cuid())
+  flockId      String
+  date         DateTime @db.Date
+  recordedById String
+
+  // Ponte (reproducteur, pondeuse, caille)
+  eggsLaid      Int?
+  eggsBroken    Int?
+  eggsCollected Int?
+
+  // Mortalite
+  mortalityCount Int     @default(0)
+  mortalityCause String?
+
+  // Alimentation
+  feedConsumedKg Float?
+  waterConsumedL Float?
+
+  // Croissance (chair)
+  avgWeightKg Float?
+  sampleSize  Int?
+
+  // Meta
+  notes    String?
+  photoUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Sync offline
+  localId  String?
+  syncedAt DateTime?
+
+  flock Flock @relation(fields: [flockId], references: [id])
+
+  @@unique([flockId, date])
+  @@index([flockId, date])
+}
+
+// ════════════════════════════════════════════════════════════
+// INCUBATION
+// ════════════════════════════════════════════════════════════
+
+model Incubator {
+  id       String  @id @default(cuid())
+  teamId   String
+  name     String
+  capacity Int
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  team    Team              @relation(fields: [teamId], references: [id])
+  batches IncubationBatch[]
+}
+
+enum IncubationStatus {
+  LOADING
+  INCUBATING
+  CANDLING_1
+  CANDLING_2
+  HATCHING
+  COMPLETED
+  CANCELLED
+}
+
+model IncubationBatch {
+  id            String           @id @default(cuid())
+  teamId        String
+  incubatorId   String
+  sourceFlockId String
+  status        IncubationStatus @default(LOADING)
+
+  // Dates
+  loadDate          DateTime  @db.Date
+  candling1Date     DateTime? @db.Date
+  candling2Date     DateTime? @db.Date
+  expectedHatchDate DateTime? @db.Date
+  actualHatchDate   DateTime? @db.Date
+
+  // Chargement
+  eggsLoaded Int
+
+  // Mirage J7
+  eggsFertile Int?
+  eggsClear   Int?
+  eggsDeadJ7  Int?
+
+  // Mirage J14
+  eggsAliveJ14 Int?
+  eggsDeadJ14  Int?
+
+  // Eclosion
+  chicksHatched Int?
+  eggsUnhatched Int?
+  chicksAliveD1 Int?
+  chicksDeadD0  Int?
+
+  // Taux calcules
+  fertilityRate Float?
+  hatchRate     Float?
+  overallRate   Float?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  incubator   Incubator @relation(fields: [incubatorId], references: [id])
+  sourceFlock Flock     @relation(fields: [sourceFlockId], references: [id])
+
+  @@index([teamId, status])
+  @@index([expectedHatchDate])
+}
+
+// ════════════════════════════════════════════════════════════
+// VACCINATION
+// ════════════════════════════════════════════════════════════
+
+enum VaccinationRoute {
+  DRINKING_WATER
+  INJECTION
+  SPRAY
+  EYE_DROP
+  OTHER
+}
+
+model VaccinationProtocol {
+  id         String           @id @default(cuid())
+  teamId     String
+  name       String
+  flockType  FlockType
+  dayOfAdmin Int
+  route      VaccinationRoute
+  notes      String?
+  createdAt  DateTime         @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@index([teamId, flockType])
+}
+
+model Vaccination {
+  id            String           @id @default(cuid())
+  flockId       String
+  vaccineName   String
+  scheduledDate DateTime         @db.Date
+  actualDate    DateTime?        @db.Date
+  route         VaccinationRoute
+  doseGiven     String?
+  isDone        Boolean          @default(false)
+  doneById      String?
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  flock Flock @relation(fields: [flockId], references: [id])
+
+  @@index([flockId, scheduledDate])
+  @@index([scheduledDate, isDone])
+}
+
+// ════════════════════════════════════════════════════════════
+// FINANCES — DEPENSES
+// ════════════════════════════════════════════════════════════
+
+enum ExpenseCategory {
+  FEED
+  HEALTH
+  ANIMAL_PURCHASE
+  EQUIPMENT
+  LABOR
+  TRANSPORT
+  ENERGY
+  OTHER
+}
+
+model Expense {
+  id           String          @id @default(cuid())
+  teamId       String
+  flockId      String?
+  date         DateTime        @db.Date
+  category     ExpenseCategory
+  subCategory  String?
+  description  String
+  amount       Int
+  photoUrl     String?
+  recordedById String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  deletedAt    DateTime?
+
+  // Sync offline
+  localId  String?
+  syncedAt DateTime?
+
+  team       Team        @relation(fields: [teamId], references: [id])
+  flock      Flock?      @relation(fields: [flockId], references: [id])
+  stockMoves StockMove[]
+
+  @@index([teamId, date])
+  @@index([teamId, category])
+}
+
+// ════════════════════════════════════════════════════════════
+// FINANCES — VENTES
+// ════════════════════════════════════════════════════════════
+
+enum ProductType {
+  CHICKS
+  FERTILE_EGGS
+  CONSUMPTION_EGGS
+  LIVE_CHICKEN
+  SLAUGHTERED_CHICKEN
+  LIVE_QUAIL
+  QUAIL_EGGS
+  QUAIL_MEAT
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  PARTIAL
+}
+
+enum PaymentMethod {
+  CASH
+  WAVE
+  ORANGE_MONEY
+  FREE_MONEY
+  BANK_TRANSFER
+  OTHER
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  teamId        String
+  flockId       String?
+  customerId    String?
+  orderId       String?       @unique
+  date          DateTime      @db.Date
+  productType   ProductType
+  quantity      Int
+  unitPrice     Int
+  totalAmount   Int
+  paymentStatus PaymentStatus @default(PAID)
+  amountPaid    Int           @default(0)
+  paymentMethod PaymentMethod?
+  notes         String?
+  recordedById  String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  // Sync offline
+  localId  String?
+  syncedAt DateTime?
+
+  team     Team          @relation(fields: [teamId], references: [id])
+  flock    Flock?        @relation(fields: [flockId], references: [id])
+  customer Customer?     @relation(fields: [customerId], references: [id])
+  order    Order?        @relation(fields: [orderId], references: [id])
+  payments SalePayment[]
+
+  @@index([teamId, date])
+  @@index([teamId, paymentStatus])
+  @@index([customerId])
+}
+
+model SalePayment {
+  id           String        @id @default(cuid())
+  saleId       String
+  date         DateTime      @db.Date
+  amount       Int
+  method       PaymentMethod
+  notes        String?
+  recordedById String
+  createdAt    DateTime      @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id])
+
+  @@index([saleId])
+}
+
+// ════════════════════════════════════════════════════════════
+// CLIENTS
+// ════════════════════════════════════════════════════════════
+
+enum CustomerType {
+  INDIVIDUAL
+  RESELLER
+  BREEDER
+}
+
+model Customer {
+  id        String       @id @default(cuid())
+  teamId    String
+  firstName String
+  lastName  String
+  phone     String?
+  city      String?
+  district  String?
+  type      CustomerType @default(INDIVIDUAL)
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  team   Team    @relation(fields: [teamId], references: [id])
+  sales  Sale[]
+  orders Order[]
+
+  @@index([teamId])
+  @@index([teamId, phone])
+}
+
+// ════════════════════════════════════════════════════════════
+// COMMANDES
+// ════════════════════════════════════════════════════════════
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  teamId        String
+  customerId    String
+  flockId       String?
+  productType   ProductType
+  quantity      Int
+  unitPrice     Int?
+  requestedDate DateTime    @db.Date
+  status        OrderStatus @default(PENDING)
+  notes         String?
+  recordedById  String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  team     Team     @relation(fields: [teamId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  flock    Flock?   @relation(fields: [flockId], references: [id])
+  sale     Sale?
+
+  @@index([teamId, status])
+  @@index([teamId, requestedDate])
+}
+
+// ════════════════════════════════════════════════════════════
+// STOCKS
+// ════════════════════════════════════════════════════════════
+
+enum StockType {
+  LAYER_FEED
+  BROILER_FEED
+  MILLET
+  SUPPLEMENT
+  VACCINE
+  MEDICATION
+  EMPTY_TRAYS
+  EGGS
+}
+
+model Stock {
+  id             String    @id @default(cuid())
+  teamId         String
+  type           StockType
+  name           String
+  currentQty     Float
+  unit           String
+  alertThreshold Float
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  team  Team        @relation(fields: [teamId], references: [id])
+  moves StockMove[]
+
+  @@unique([teamId, type])
+  @@index([teamId])
+}
+
+enum StockMoveType {
+  IN_PURCHASE
+  IN_PRODUCTION
+  IN_OTHER
+  OUT_CONSUMPTION
+  OUT_INCUBATION
+  OUT_SALE
+  OUT_LOSS
+  OUT_OTHER
+  ADJUSTMENT
+}
+
+model StockMove {
+  id           String        @id @default(cuid())
+  stockId      String
+  type         StockMoveType
+  quantity     Float
+  date         DateTime      @db.Date
+  description  String?
+  expenseId    String?
+  recordedById String
+  createdAt    DateTime      @default(now())
+
+  // Sync offline
+  localId  String?
+  syncedAt DateTime?
+
+  stock   Stock    @relation(fields: [stockId], references: [id])
+  expense Expense? @relation(fields: [expenseId], references: [id])
+
+  @@index([stockId, date])
+}
+
+// ════════════════════════════════════════════════════════════
+// ALERTES
+// ════════════════════════════════════════════════════════════
+
+enum AlertType {
+  LOW_STOCK
+  CANDLING_DUE
+  HATCH_DUE
+  VACCINATION_DUE
+  SLAUGHTER_DUE
+  LOW_LAYING_RATE
+  HIGH_MORTALITY
+  OLD_DEBT
+  MISSING_RECORD
+  MALE_RATIO
+  LAYER_END_CYCLE
+  ORDER_DUE
+}
+
+enum AlertPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Alert {
+  id          String        @id @default(cuid())
+  teamId      String
+  type        AlertType
+  priority    AlertPriority
+  title       String
+  message     String
+  isRead      Boolean       @default(false)
+  isDismissed Boolean       @default(false)
+  referenceId String?
+  createdAt   DateTime      @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@index([teamId, isRead])
+  @@index([teamId, type])
+}
+
+// ════════════════════════════════════════════════════════════
+// AUDIT LOG
+// ════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@index([teamId, createdAt])
+  @@index([teamId, entity])
+}
