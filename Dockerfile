@@ -63,8 +63,5 @@ USER node
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=60s --timeout=5s --start-period=45s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT:-4000}/health" >/dev/null || exit 1
-
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/main"]
