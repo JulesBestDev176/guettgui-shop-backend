@@ -4,7 +4,7 @@
   "private": true,
   "description": "Backend NestJS pour Charcut'SN",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
     "lint": "eslint \"src/**/*.ts\"",
