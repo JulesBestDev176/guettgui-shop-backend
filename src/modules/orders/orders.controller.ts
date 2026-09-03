@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
+import { AuthUser } from "../../common/types/auth-user";
 import { CheckoutDto } from "./dto/checkout.dto";
 import { OrdersService } from "./orders.service";
 
@@ -29,8 +31,8 @@ export class OrdersController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get("orders")
-  orders() {
-    return this.ordersService.list();
+  orders(@CurrentUser() user: AuthUser) {
+    return this.ordersService.list(user.id);
   }
 
   @ApiBearerAuth()
@@ -44,23 +46,23 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Get("seller/orders")
-  sellerOrders() {
-    return this.ordersService.list();
+  sellerOrders(@CurrentUser() user: AuthUser) {
+    return this.ordersService.listSellerOrders(user.id);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Get("seller/orders/:id")
-  sellerOrder(@Param("id") id: string) {
-    return this.ordersService.findById(id);
+  sellerOrder(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.ordersService.getSellerOrder(user.id, id);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Patch("seller/orders/:id/preparing")
-  markPreparing(@Param("id") id: string) {
-    return this.ordersService.updateStatus(id, "PREPARING");
+  markPreparing(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.ordersService.markPreparing(user.id, id);
   }
 }

@@ -15,25 +15,30 @@ import { SellersService } from "./sellers.service";
 export class SellersController {
   constructor(private readonly sellersService: SellersService) {}
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post("seller-applications")
-  createApplication(@Body() dto: CreateSellerApplicationDto) {
-    return this.sellersService.createApplication(dto);
+  createApplication(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateSellerApplicationDto,
+  ) {
+    return this.sellersService.createApplication(dto, user);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Get("seller/dashboard")
-  dashboard() {
-    return this.sellersService.dashboard();
+  dashboard(@CurrentUser() user: AuthUser) {
+    return this.sellersService.dashboard(user.id);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Get("seller/products")
-  products() {
-    return this.sellersService.listProducts();
+  products(@CurrentUser() user: AuthUser) {
+    return this.sellersService.listProducts(user.id);
   }
 
   @ApiBearerAuth()
@@ -48,31 +53,34 @@ export class SellersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Get("seller/delivery-zones")
-  deliveryZones() {
-    return this.sellersService.listDeliveryZones();
+  deliveryZones(@CurrentUser() user: AuthUser) {
+    return this.sellersService.listDeliveryZones(user.id);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Post("seller/delivery-zones")
-  createDeliveryZone(@Body() dto: CreateDeliveryZoneDto) {
-    return this.sellersService.createDeliveryZone(dto);
+  createDeliveryZone(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateDeliveryZoneDto,
+  ) {
+    return this.sellersService.createDeliveryZone(user.id, dto);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Patch("seller/delivery-zones/:id/toggle")
-  toggleDeliveryZone(@Param("id") id: string) {
-    return this.sellersService.toggleDeliveryZone(id);
+  toggleDeliveryZone(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.sellersService.toggleDeliveryZone(user.id, id);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SELLER")
   @Get("seller/stats")
-  stats() {
-    return this.sellersService.stats();
+  stats(@CurrentUser() user: AuthUser) {
+    return this.sellersService.stats(user.id);
   }
 }

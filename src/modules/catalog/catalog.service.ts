@@ -1,57 +1,112 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../database/prisma.service";
 import { ListProductsQuery } from "./dto/list-products.query";
-
-const categories = [
-  { id: "cat-chair", name: "Poulet de chair", slug: "poulet-de-chair" },
-  { id: "cat-local", name: "Poulet local", slug: "poulet-local" },
-  { id: "cat-lot", name: "Vente en lot", slug: "vente-en-lot" },
-  { id: "cat-oeufs", name: "Oeufs", slug: "oeufs" },
-  { id: "cat-dinde", name: "Dinde", slug: "dinde" },
-];
-
-const products = [
-  { id: "prd-1", slug: "poulet-entier-frais", name: "Poulet de chair 2 kg", price: 3500, category: "Poulet de chair", seller: "Ferme Keur Massar", city: "Thies", stock: 45, delivery: true },
-  { id: "prd-2", slug: "poulet-local-fermier", name: "Poulet local fermier vivant", price: 4200, category: "Poulet local", seller: "Elevage Ndiaye", city: "Dakar", stock: 28, delivery: true },
-  { id: "prd-3", slug: "lot-25-poulets", name: "Lot de 25 poulets locaux", price: 98000, category: "Vente en lot", seller: "Coop Bio Mbour", city: "Mbour", stock: 8, delivery: false },
-  { id: "prd-4", slug: "plateau-oeufs-frais", name: "Plateau 30 oeufs frais", price: 4200, category: "Oeufs", seller: "Pondeuses du Sine", city: "Fatick", stock: 62, delivery: true },
-];
 
 @Injectable()
 export class CatalogService {
+  constructor(private readonly prisma: PrismaService) {}
+
   listCategories() {
-    return categories;
+    return this.prisma.category.findMany({
+      orderBy: { sortOrder: "asc" },
+    });
   }
 
-  listProducts(query: ListProductsQuery) {
-    const filtered = products.filter((product) => {
-      const matchSearch = !query.q || product.name.toLowerCase().includes(query.q.toLowerCase());
-      const matchCategory = !query.category || product.category === query.category;
-      const matchCity = !query.city || product.city === query.city;
-      const matchDelivery = query.delivery === undefined || product.delivery === (query.delivery === "true");
-      return matchSearch && matchCategory && matchCity && matchDelivery;
-    });
+  async listProducts(query: ListProductsQuery) {
+    const where: Prisma.ProductWhereInput = {
+      status: "ACTIVE",
+    };
+
+    if (query.q) {
+      where.name = { contains: query.q, mode: "insensitive" };
+    }
+
+    if (query.category) {
+      where.category = { slug: query.category };
+    }
+
+    if (query.city) {
+      where.city = query.city;
+    }
+
+    if (query.delivery === "true") {
+      where.seller = { zones: { some: { active: true } } };
+    }
+
+    const skip = (query.page - 1) * query.limit;
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        skip,
+        take: query.limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          seller: { select: { shopName: true } },
+          category: true,
+          images: { orderBy: { sortOrder: "asc" } },
+        },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
 
     return {
-      data: filtered,
+      data,
       meta: {
         page: query.page,
         limit: query.limit,
-        total: filtered.length,
-        pageCount: Math.ceil(filtered.length / query.limit),
+        total,
+        pageCount: Math.ceil(total / query.limit),
       },
     };
   }
 
-  getProduct(slug: string) {
-    const product = products.find((item) => item.slug === slug);
+  async getProduct(slug: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { slug },
+      include: {
+        seller: { select: { shopName: true, city: true, region: true } },
+        category: true,
+        images: { orderBy: { sortOrder: "asc" } },
+        priceOptions: true,
+        reviews: {
+          include: { user: { select: { fullName: true } } },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
     if (!product) {
       throw new NotFoundException("Produit introuvable");
     }
+
     return product;
   }
 
-  getRelated(slug: string) {
-    const product = this.getProduct(slug);
-    return products.filter((item) => item.category === product.category && item.slug !== slug).slice(0, 4);
+  async getRelated(slug: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { slug },
+      select: { categoryId: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException("Produit introuvable");
+    }
+
+    return this.prisma.product.findMany({
+      where: {
+        categoryId: product.categoryId,
+        slug: { not: slug },
+        status: "ACTIVE",
+      },
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      include: {
+        seller: { select: { shopName: true } },
+        category: true,
+        images: { orderBy: { sortOrder: "asc" } },
+      },
+    });
   }
 }

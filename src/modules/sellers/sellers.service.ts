@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../database/prisma.service";
 import { AuthUser } from "../../common/types/auth-user";
 import { CreateDeliveryZoneDto } from "./dto/create-delivery-zone.dto";
 import { CreateProductDto } from "./dto/create-product.dto";
@@ -6,74 +7,195 @@ import { CreateSellerApplicationDto } from "./dto/create-seller-application.dto"
 
 @Injectable()
 export class SellersService {
-  private readonly products = [
-    { id: "PRD-001", name: "Poulet entier frais", stock: 24, price: 4500, status: "ACTIVE" },
-    { id: "PRD-002", name: "Cuisses de poulet x6", stock: 8, price: 3200, status: "ACTIVE" },
-  ];
+  constructor(private readonly prisma: PrismaService) {}
 
-  private readonly deliveryZones = [
-    { id: "zone-1", name: "Thies Nord", region: "Thies", city: "Thies Nord", fee: 1000, estimatedTime: "30-45 min", minimumOrderAmount: 5000, active: true },
-    { id: "zone-2", name: "Dakar Plateau", region: "Dakar", city: "Plateau", fee: 6000, estimatedTime: "3-4 h", minimumOrderAmount: 40000, active: false },
-  ];
+  private async getSellerByUserId(userId: string) {
+    const seller = await this.prisma.seller.findUnique({
+      where: { userId },
+    });
+    if (!seller) {
+      throw new NotFoundException("Profil vendeur introuvable");
+    }
+    return seller;
+  }
 
-  createApplication(dto: CreateSellerApplicationDto) {
+  private slugify(name: string): string {
+    return name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  }
+
+  async createApplication(dto: CreateSellerApplicationDto, user: AuthUser) {
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30);
+
+    const seller = await this.prisma.seller.create({
+      data: {
+        userId: user.id,
+        shopName: dto.shopName,
+        city: dto.city,
+        region: dto.region,
+        status: "PENDING_REVIEW",
+        subscription: {
+          create: {
+            status: "TRIAL",
+            endDate,
+          },
+        },
+      },
+      include: { subscription: true },
+    });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { role: "SELLER" },
+    });
+
+    return seller;
+  }
+
+  async dashboard(userId: string) {
+    const seller = await this.getSellerByUserId(userId);
+
+    const [ordersCount, revenue, activeProducts, ratingAvg] =
+      await Promise.all([
+        this.prisma.orderItem.count({
+          where: { sellerId: seller.id },
+        }),
+        this.prisma.orderItem.aggregate({
+          where: { sellerId: seller.id },
+          _sum: { total: true },
+        }),
+        this.prisma.product.count({
+          where: { sellerId: seller.id, status: "ACTIVE" },
+        }),
+        this.prisma.review.aggregate({
+          where: { product: { sellerId: seller.id } },
+          _avg: { rating: true },
+        }),
+      ]);
+
     return {
-      id: crypto.randomUUID(),
-      ...dto,
-      status: "PENDING_REVIEW",
-      requiredDocuments: ["IDENTITY"],
+      revenueMonth: revenue._sum.total ?? 0,
+      ordersCount,
+      activeProducts,
+      ratingAverage: ratingAvg._avg.rating
+        ? Math.round(ratingAvg._avg.rating * 10) / 10
+        : 0,
     };
   }
 
-  dashboard() {
-    return {
-      revenueMonth: 287500,
-      ordersCount: 42,
-      activeProducts: 8,
-      ratingAverage: 4.8,
-    };
+  async listProducts(userId: string) {
+    const seller = await this.getSellerByUserId(userId);
+
+    return this.prisma.product.findMany({
+      where: { sellerId: seller.id },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        category: { select: { id: true, name: true, slug: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
   }
 
-  listProducts() {
-    return this.products;
+  async createProduct(user: AuthUser, dto: CreateProductDto) {
+    const seller = await this.getSellerByUserId(user.id);
+
+    let slug = this.slugify(dto.name);
+
+    const existing = await this.prisma.product.findUnique({
+      where: { slug },
+    });
+    if (existing) {
+      slug = `${slug}-${Date.now()}`;
+    }
+
+    return this.prisma.product.create({
+      data: {
+        sellerId: seller.id,
+        categoryId: dto.categoryId,
+        name: dto.name,
+        slug,
+        description: dto.description,
+        basePrice: dto.basePrice,
+        stock: dto.stock,
+        unit: dto.unit,
+        city: seller.city,
+        status: "DRAFT",
+      },
+      include: {
+        images: true,
+        category: { select: { id: true, name: true, slug: true } },
+      },
+    });
   }
 
-  createProduct(_user: AuthUser, dto: CreateProductDto) {
-    const product = {
-      id: crypto.randomUUID(),
-      ...dto,
-      price: dto.basePrice,
-      status: "DRAFT",
-    };
-    this.products.push(product);
-    return product;
+  async listDeliveryZones(userId: string) {
+    const seller = await this.getSellerByUserId(userId);
+
+    return this.prisma.deliveryZone.findMany({
+      where: { sellerId: seller.id },
+      orderBy: { createdAt: "desc" },
+    });
   }
 
-  listDeliveryZones() {
-    return this.deliveryZones;
+  async createDeliveryZone(userId: string, dto: CreateDeliveryZoneDto) {
+    const seller = await this.getSellerByUserId(userId);
+
+    return this.prisma.deliveryZone.create({
+      data: {
+        sellerId: seller.id,
+        name: dto.name,
+        region: dto.region,
+        city: dto.city,
+        fee: dto.fee,
+        estimatedTime: dto.estimatedTime,
+        minimumOrderAmount: dto.minimumOrderAmount,
+        active: dto.active ?? true,
+      },
+    });
   }
 
-  createDeliveryZone(dto: CreateDeliveryZoneDto) {
-    const zone = { id: crypto.randomUUID(), active: true, ...dto };
-    this.deliveryZones.push(zone);
-    return zone;
-  }
+  async toggleDeliveryZone(userId: string, id: string) {
+    const seller = await this.getSellerByUserId(userId);
 
-  toggleDeliveryZone(id: string) {
-    const zone = this.deliveryZones.find((item) => item.id === id);
+    const zone = await this.prisma.deliveryZone.findFirst({
+      where: { id, sellerId: seller.id },
+    });
     if (!zone) {
       throw new NotFoundException("Zone introuvable");
     }
-    zone.active = !zone.active;
-    return zone;
+
+    return this.prisma.deliveryZone.update({
+      where: { id },
+      data: { active: !zone.active },
+    });
   }
 
-  stats() {
+  async stats(userId: string) {
+    const seller = await this.getSellerByUserId(userId);
+
+    const [revenueAgg, orderCount] = await Promise.all([
+      this.prisma.orderItem.aggregate({
+        where: { sellerId: seller.id },
+        _sum: { total: true },
+      }),
+      this.prisma.orderItem.count({
+        where: { sellerId: seller.id },
+      }),
+    ]);
+
+    const revenue = revenueAgg._sum.total ?? 0;
+    const averageBasket = orderCount > 0 ? Math.round(revenue / orderCount) : 0;
+
     return {
-      revenue: 287500,
-      averageBasket: 9850,
-      productViews: 1284,
-      conversionRate: 8.4,
+      revenue,
+      averageBasket,
+      productViews: orderCount,
+      conversionRate: 0,
     };
   }
 }

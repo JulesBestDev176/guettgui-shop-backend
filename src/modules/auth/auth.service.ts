@@ -23,7 +23,7 @@ export class AuthService {
     const user = await this.usersService.create({
       fullName: dto.fullName,
       phone: dto.phone,
-      email: dto.email,
+      email: dto.email ?? null,
       role: dto.role ?? "CLIENT",
       passwordHash: await argon2.hash(dto.password),
     });
