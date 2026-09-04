@@ -1,16 +1,12 @@
-import { IsEmail, IsOptional, IsPhoneNumber, IsString, MinLength } from "class-validator";
+import { IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateSellerApplicationDto {
   @IsString()
   @MinLength(2)
   fullName: string;
 
-  @IsPhoneNumber("SN")
+  @IsString()
   phone: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
 
   @IsString()
   shopName: string;
@@ -21,6 +17,7 @@ export class CreateSellerApplicationDto {
   @IsString()
   city: string;
 
+  @IsOptional()
   @IsString()
-  sellerType: string;
+  description?: string;
 }
