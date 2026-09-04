@@ -8,12 +8,18 @@ import { AuthUser } from "../../common/types/auth-user";
 import { CreateDeliveryZoneDto } from "./dto/create-delivery-zone.dto";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { CreateSellerApplicationDto } from "./dto/create-seller-application.dto";
+import { RegisterSellerDto } from "./dto/register-seller.dto";
 import { SellersService } from "./sellers.service";
 
 @ApiTags("sellers")
 @Controller()
 export class SellersController {
   constructor(private readonly sellersService: SellersService) {}
+
+  @Post("seller-register")
+  registerSeller(@Body() dto: RegisterSellerDto) {
+    return this.sellersService.registerSeller(dto);
+  }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

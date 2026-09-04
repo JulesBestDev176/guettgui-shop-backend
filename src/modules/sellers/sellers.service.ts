@@ -1,13 +1,21 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import * as argon2 from "argon2";
 import { PrismaService } from "../../database/prisma.service";
 import { AuthUser } from "../../common/types/auth-user";
 import { CreateDeliveryZoneDto } from "./dto/create-delivery-zone.dto";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { CreateSellerApplicationDto } from "./dto/create-seller-application.dto";
+import { RegisterSellerDto } from "./dto/register-seller.dto";
 
 @Injectable()
 export class SellersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   private async getSellerByUserId(userId: string) {
     const seller = await this.prisma.seller.findUnique({
@@ -26,6 +34,53 @@ export class SellersService {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
+  }
+
+  async registerSeller(dto: RegisterSellerDto) {
+    const existing = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    if (existing) {
+      throw new ConflictException("Ce telephone est deja utilise");
+    }
+
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30);
+
+    const user = await this.prisma.user.create({
+      data: {
+        fullName: dto.fullName,
+        phone: dto.phone,
+        email: dto.email ?? null,
+        passwordHash: await argon2.hash(dto.password),
+        role: "SELLER",
+        seller: {
+          create: {
+            shopName: dto.shopName,
+            city: dto.city,
+            region: dto.region,
+            description: dto.description,
+            status: "PENDING_REVIEW",
+            subscription: {
+              create: { status: "TRIAL", endDate },
+            },
+          },
+        },
+      },
+      include: { seller: { include: { subscription: true } } },
+    });
+
+    const payload = { id: user.id, phone: user.phone, role: user.role };
+    return {
+      user: payload,
+      seller: user.seller,
+      accessToken: await this.jwtService.signAsync(payload, {
+        secret: this.configService.getOrThrow<string>("JWT_ACCESS_SECRET"),
+        expiresIn: this.configService.get<string>("JWT_ACCESS_EXPIRES_IN", "15m"),
+      }),
+      refreshToken: await this.jwtService.signAsync(payload, {
+        secret: this.configService.getOrThrow<string>("JWT_REFRESH_SECRET"),
+        expiresIn: this.configService.get<string>("JWT_REFRESH_EXPIRES_IN", "30d"),
+      }),
+    };
   }
 
   async createApplication(dto: CreateSellerApplicationDto, user: AuthUser) {
