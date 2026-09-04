@@ -32,7 +32,7 @@ ENV NODE_ENV=development
 COPY . .
 
 RUN npx prisma generate
-RUN npm run build
+RUN npm run build && ls -la dist/ && (test -f dist/main.js || (echo "dist/main.js not found, checking dist/src/" && cp -r dist/src/* dist/))
 
 FROM deps AS production-deps
 
