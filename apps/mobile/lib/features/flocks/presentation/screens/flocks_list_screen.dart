@@ -2,84 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
+import 'package:guettgui_mobile/features/flocks/domain/entities/flock.dart';
+import 'package:guettgui_mobile/features/flocks/presentation/providers/flock_provider.dart';
 
 final flocksFilterProvider = StateProvider<String>((ref) => 'Tous');
-
-/// Mock flock data matching prototype FLOCKS array
-class _FlockData {
-  final int id;
-  final String name;
-  final String type;
-  final String count;
-  final Color dotColor;
-  final String key_;
-  final Color keyColor;
-  final String status;
-
-  const _FlockData({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.count,
-    required this.dotColor,
-    required this.key_,
-    required this.keyColor,
-    required this.status,
-  });
-}
-
-const _flocks = [
-  _FlockData(
-    id: 1,
-    name: 'Pondeuses A1',
-    type: 'Pondeuse',
-    count: '200 sujets',
-    dotColor: AppColors.warning,
-    key_: '142 oeufs/j',
-    keyColor: AppColors.primary,
-    status: 'Actif',
-  ),
-  _FlockData(
-    id: 2,
-    name: 'Chair B2',
-    type: 'Chair',
-    count: '180 sujets',
-    dotColor: AppColors.info,
-    key_: 'J-15',
-    keyColor: AppColors.warning,
-    status: 'Actif',
-  ),
-  _FlockData(
-    id: 3,
-    name: 'Repro C1',
-    type: 'Repro',
-    count: '90 sujets',
-    dotColor: AppColors.primary,
-    key_: '68 oeufs/j',
-    keyColor: AppColors.primary,
-    status: 'Actif',
-  ),
-  _FlockData(
-    id: 4,
-    name: 'Cailles D1',
-    type: 'Caille',
-    count: '50 sujets',
-    dotColor: AppColors.gold,
-    key_: '31 oeufs/j',
-    keyColor: AppColors.primary,
-    status: 'Actif',
-  ),
-  _FlockData(
-    id: 5,
-    name: 'Chair A3',
-    type: 'Chair',
-    count: '120 sujets',
-    dotColor: AppColors.info,
-    key_: 'Cloture',
-    keyColor: AppColors.grey500,
-    status: 'Termine',
-  ),
-];
 
 class FlocksListScreen extends ConsumerWidget {
   const FlocksListScreen({super.key});
@@ -88,9 +15,8 @@ class FlocksListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(flocksFilterProvider);
     final chips = ['Tous', 'Repro', 'Pondeuse', 'Chair', 'Caille'];
-    final filtered = _flocks
-        .where((f) => filter == 'Tous' || f.type == filter)
-        .toList();
+    final teamIdAsync = ref.watch(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.ivory,
@@ -162,106 +88,192 @@ class FlocksListScreen extends ConsumerWidget {
 
             // List cards
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final f = filtered[index];
-                  return GestureDetector(
-                    onTap: () => context.push('/flocks/${f.id}'),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.cardBorder),
+              child: teamId == null
+                  ? Center(
+                      child: Text(
+                        'Aucune equipe configuree',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMeta,
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          // Dot
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: f.dotColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Name + detail
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  f.name,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.night,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${f.count} \u00b7 ${f.type}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textMeta,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Right: key + status chip
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                f.key_,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: f.keyColor,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: f.status == 'Actif'
-                                      ? AppColors.primary
-                                          .withValues(alpha: 0.12)
-                                      : AppColors.night
-                                          .withValues(alpha: 0.06),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  f.status,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                    color: f.status == 'Actif'
-                                        ? AppColors.primary
-                                        : AppColors.textMeta,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+                    )
+                  : _FlocksList(teamId: teamId, filter: filter),
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+class _FlocksList extends ConsumerWidget {
+  final String teamId;
+  final String filter;
+
+  const _FlocksList({required this.teamId, required this.filter});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final flocksAsync = ref.watch(flockListProvider(teamId));
+
+    return flocksAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Impossible de charger les lots',
+              style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => ref.invalidate(flockListProvider(teamId)),
+              child: const Text('Reessayer'),
+            ),
+          ],
+        ),
+      ),
+      data: (allFlocks) {
+        final filtered = allFlocks.where((f) {
+          if (filter == 'Tous') return true;
+          return f.typeLabel == filter;
+        }).toList();
+
+        if (filtered.isEmpty) {
+          return Center(
+            child: Text(
+              'Aucun lot trouve',
+              style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(flockListProvider(teamId));
+          },
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+            itemCount: filtered.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final f = filtered[index];
+              return GestureDetector(
+                onTap: () => context.push('/flocks/${f.id}'),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      // Dot
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _dotColor(f),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Name + detail
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              f.name,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.night,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${f.currentTotal} sujets \u00b7 ${f.typeLabel}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textMeta,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Right: status chip
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _keyLabel(f),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _keyColor(f),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: f.isActive
+                                  ? AppColors.primary
+                                      .withValues(alpha: 0.12)
+                                  : AppColors.night
+                                      .withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              f.isActive ? 'Actif' : 'Termine',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: f.isActive
+                                    ? AppColors.primary
+                                    : AppColors.textMeta,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Color _dotColor(Flock f) {
+    return switch (f.type) {
+      'LAYER' => AppColors.warning,
+      'BROILER' => AppColors.info,
+      'BREEDER' => AppColors.primary,
+      'QUAIL' => AppColors.gold,
+      _ => AppColors.primary,
+    };
+  }
+
+  String _keyLabel(Flock f) {
+    if (!f.isActive) return 'Cloture';
+    if (f.isBroiler) return 'J-${f.ageInDays}';
+    return '${f.currentTotal} sujets';
+  }
+
+  Color _keyColor(Flock f) {
+    if (!f.isActive) return AppColors.grey500;
+    if (f.isBroiler) return AppColors.warning;
+    return AppColors.primary;
   }
 }

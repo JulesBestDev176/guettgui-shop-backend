@@ -90,7 +90,7 @@ class ProfileScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  user?.fullName ?? 'Amadou Diallo',
+                                  user?.fullName ?? '',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -99,7 +99,7 @@ class ProfileScreen extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  user?.phone ?? '+221 77 123 45 67',
+                                  user?.phone ?? '',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textMeta,

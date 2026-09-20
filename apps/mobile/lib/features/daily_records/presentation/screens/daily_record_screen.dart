@@ -1,8 +1,14 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
+import 'package:guettgui_mobile/features/daily_records/presentation/providers/daily_record_provider.dart';
+import 'package:guettgui_mobile/features/flocks/presentation/providers/flock_provider.dart';
+import 'package:intl/intl.dart';
 
 /// Daily record: counters +/- for oeufs, casses, mortalite + aliment + notes
 class DailyRecordScreen extends ConsumerStatefulWidget {
@@ -15,11 +21,12 @@ class DailyRecordScreen extends ConsumerStatefulWidget {
 }
 
 class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
-  int _eggs = 150;
-  int _broken = 8;
-  int _mort = 2;
-  final _feedController = TextEditingController(text: '24');
+  int _eggs = 0;
+  int _broken = 0;
+  int _mort = 0;
+  final _feedController = TextEditingController(text: '0');
   final _notesController = TextEditingController();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -30,30 +37,92 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
 
   int get _collected => (_eggs - _broken).clamp(0, 99999);
 
-  void _save() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Saisie enregistree',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
+  Future<void> _save() async {
+    final teamIdAsync = ref.read(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+    if (teamId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier =
+          ref.read(dailyRecordNotifierProvider(teamId).notifier);
+      await notifier.createRecord({
+        'flockId': widget.flockId,
+        'date': DateTime.now().toIso8601String().split('T').first,
+        'eggsLaid': _eggs,
+        'eggsBroken': _broken,
+        'eggsCollected': _collected,
+        'mortalityCount': _mort,
+        'feedConsumedKg': double.tryParse(_feedController.text) ?? 0,
+        'notes': _notesController.text.isNotEmpty
+            ? _notesController.text
+            : null,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Saisie enregistree',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: AppColors.night,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
           ),
-        ),
-        backgroundColor: AppColors.night,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-      ),
-    );
-    context.pop();
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erreur: $e',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final teamIdAsync = ref.watch(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+
+    // Get flock name from API
+    String flockName = 'Lot';
+    if (teamId != null) {
+      final flockAsync = ref.watch(
+        flockDetailProvider((teamId: teamId, flockId: widget.flockId)),
+      );
+      flockName = flockAsync.valueOrNull?.name ?? 'Lot';
+    }
+
+    final dateStr = DateFormat('d MMMM', 'fr_FR').format(DateTime.now());
+
     return Scaffold(
       backgroundColor: AppColors.ivory,
       body: SafeArea(
@@ -82,7 +151,7 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
                     ),
                     const Spacer(),
                     Text(
-                      '30 aout',
+                      dateStr,
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textMeta,
@@ -101,9 +170,9 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Flock name
-                    const Text(
-                      'Pondeuses A1',
-                      style: TextStyle(
+                    Text(
+                      flockName,
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.night,
@@ -164,39 +233,6 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
                       onDec: () =>
                           setState(() => _mort = (_mort - 1).clamp(0, 99999)),
                       onInc: () => setState(() => _mort++),
-                      extraChild: _mort > 0
-                          ? Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Container(
-                                height: 52,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border:
-                                      Border.all(color: AppColors.inputBorder),
-                                ),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 14),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      'Cause : Maladie',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: AppColors.night
-                                            .withValues(alpha: 0.75),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Icon(
-                                      Icons.expand_more,
-                                      size: 20,
-                                      color: AppColors.textMeta,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : null,
                     ),
                     const SizedBox(height: 16),
 
@@ -273,7 +309,7 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _save,
+                        onPressed: _isSaving ? null : _save,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -282,13 +318,22 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'Enregistrer',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Enregistrer',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -303,8 +348,6 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
 }
 
 /// Counter card: white card, radius 16, padding 14
-/// Label 12px w500 alpha0.55
-/// Row: [-] [value 36px w700] [+]
 class _CounterCard extends StatelessWidget {
   final String label;
   final int value;
@@ -346,7 +389,6 @@ class _CounterCard extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Minus button: 44px circle, border, fond blanc
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -371,7 +413,6 @@ class _CounterCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Value: 80px wide, center, 36px w700
                 SizedBox(
                   width: 80,
                   child: Center(
@@ -386,7 +427,6 @@ class _CounterCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Plus button: 44px circle, fond vert
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();

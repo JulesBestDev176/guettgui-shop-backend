@@ -9,6 +9,7 @@ import {
   CreditCard,
   Edit3,
   Eye,
+  Loader2,
   MapPin,
   Package,
   Plus,
@@ -29,9 +30,15 @@ import {
   getSellerProducts,
   getSellerDeliveryZones,
   getSellerStats,
+  getSellerOrders,
+  updateOrderStatus,
+  updateSellerProduct,
+  deleteSellerProduct,
   getMe,
+  getMyShop,
+  updateMyShop,
 } from "@/lib/api";
-import type { Product, DeliveryZone } from "@/lib/types";
+import type { Product, DeliveryZone, Order, OrderListResponse } from "@/lib/types";
 
 // ── Shared UI helpers (pure, no data) ──
 
@@ -108,8 +115,23 @@ function EmptyState({ icon: Icon, title, description }: { icon: React.ElementTyp
   );
 }
 
-function ProductCard({ product }: { product: Product }) {
-  const statusLabel = product.status === "ACTIVE" ? "Actif" : product.status === "OUT_OF_STOCK" ? "Rupture" : product.status === "DRAFT" ? "Brouillon" : "Suspendu";
+function ProductCard({
+  product,
+  onUpdated,
+  onDeleted,
+}: {
+  product: Product;
+  onUpdated: (p: Product) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [price, setPrice] = useState(String(product.basePrice));
+  const [stock, setStock] = useState(String(product.stock));
+  const [status, setStatus] = useState(product.status);
+
+  const statusLabel = status === "ACTIVE" ? "Actif" : status === "OUT_OF_STOCK" ? "Rupture" : status === "DRAFT" ? "Brouillon" : "Suspendu";
   const statusColors: Record<string, string> = {
     Actif: "bg-[#DCFCE7] text-[#15803D]",
     Rupture: "bg-[#F1F5F9] text-[#64748B]",
@@ -117,6 +139,32 @@ function ProductCard({ product }: { product: Product }) {
     Suspendu: "bg-[#FEE2E2] text-[#DC2626]",
   };
   const image = product.images?.[0]?.url ?? "/placeholder-product.jpg";
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updated = await updateSellerProduct(product.id, {
+        basePrice: parseFloat(price) || product.basePrice,
+        stock: parseInt(stock) || 0,
+        status,
+      });
+      onUpdated(updated);
+      setEditing(false);
+    } catch {} finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Supprimer "${product.name}" ?`)) return;
+    setDeleting(true);
+    try {
+      await deleteSellerProduct(product.id);
+      onDeleted(product.id);
+    } catch {} finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-3 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
@@ -129,20 +177,77 @@ function ProductCard({ product }: { product: Product }) {
           </div>
           <Badge className={`rounded-full px-3 py-1 ${statusColors[statusLabel] ?? statusColors.Suspendu}`}>{statusLabel}</Badge>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-lg font-extrabold text-[#22A849]">{product.basePrice.toLocaleString()} F</p>
-            <p className="font-body text-xs text-[#6B7280]">{product.stock > 0 ? `${product.stock} en stock` : "Stock epuise"}</p>
+
+        {editing ? (
+          <div className="mt-3 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="mb-1 text-[10px] font-semibold text-[#6B7280]">Prix (F)</p>
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="h-9 w-full rounded-[8px] border border-[#E5E7EB] px-2 text-sm outline-none focus:border-[#22A849] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-semibold text-[#6B7280]">Stock</p>
+                <input
+                  type="number"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  className="h-9 w-full rounded-[8px] border border-[#E5E7EB] px-2 text-sm outline-none focus:border-[#22A849] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="h-9 w-full rounded-[8px] border border-[#E5E7EB] px-2 text-sm outline-none focus:border-[#22A849]"
+            >
+              <option value="ACTIVE">Actif</option>
+              <option value="OUT_OF_STOCK">Rupture</option>
+              <option value="DRAFT">Brouillon</option>
+            </select>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex h-8 flex-1 items-center justify-center rounded-[8px] bg-[#22A849] text-xs font-bold text-white disabled:opacity-60"
+              >
+                {saving ? "…" : "Enregistrer"}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="flex h-8 flex-1 items-center justify-center rounded-[8px] border border-[#E5E7EB] text-xs font-semibold text-[#6B7280]"
+              >
+                Annuler
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-[#1F2937] transition hover:border-[#22A849] hover:text-[#22A849]">
-              <Edit3 size={15} />
-            </button>
-            <button className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-[#22A849] transition hover:bg-[#F0FDF4]">
-              <Trash2 size={15} />
-            </button>
+        ) : (
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-lg font-extrabold text-[#22A849]">{product.basePrice.toLocaleString()} F</p>
+              <p className="font-body text-xs text-[#6B7280]">{product.stock > 0 ? `${product.stock} en stock` : "Stock épuisé"}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditing(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-[#1F2937] transition hover:border-[#22A849] hover:text-[#22A849]"
+              >
+                <Edit3 size={15} />
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-red-500 transition hover:bg-red-50 disabled:opacity-60"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={15} />}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -153,6 +258,7 @@ function ProductCard({ product }: { product: Product }) {
 export function OverviewPage() {
   const [dashboard, setDashboard] = useState<{ revenueMonth: number; ordersCount: number; activeProducts: number; ratingAverage: number } | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("Ma boutique");
 
@@ -167,10 +273,11 @@ export function OverviewPage() {
       }
     } catch {}
 
-    Promise.all([getSellerDashboard(), getSellerProducts()])
-      .then(([d, p]) => {
+    Promise.all([getSellerDashboard(), getSellerProducts(), getSellerOrders({ limit: 5 })])
+      .then(([d, p, o]) => {
         setDashboard(d);
         setProducts(p);
+        setRecentOrders(o.data);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -235,12 +342,31 @@ export function OverviewPage() {
         <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-bold text-[#1F2937]">Commandes</h2>
+              <h2 className="text-lg font-bold text-[#1F2937]">Commandes récentes</h2>
               <p className="font-body text-xs text-[#6B7280]">Demandes client et suivi preparation</p>
             </div>
             <Link href="/vendeur/commandes" className="text-xs font-bold text-[#22A849]">Voir tout</Link>
           </div>
-          <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes de vos clients apparaitront ici." />
+          {recentOrders.length === 0 ? (
+            <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes de vos clients apparaitront ici." />
+          ) : (
+            <div className="space-y-3">
+              {recentOrders.map((order) => (
+                <div key={order.id} className="flex items-center gap-3 rounded-[14px] bg-[#FAFAFA] p-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-[#1F2937]">#{order.code}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_COLORS[order.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                        {STATUS_LABELS[order.status] ?? order.status}
+                      </span>
+                    </div>
+                    <p className="font-body text-xs text-[#6B7280] truncate">{order.customerName}</p>
+                  </div>
+                  <p className="text-sm font-bold text-[#22A849] shrink-0">{order.total.toLocaleString()} F</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
@@ -321,35 +447,309 @@ export function ProductsPage() {
         <EmptyState icon={Package} title="Aucun produit" description={products.length === 0 ? "Ajoutez votre premier produit pour commencer a vendre." : "Aucun produit ne correspond a votre recherche."} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((product) => <ProductCard key={product.id} product={product} />)}
+          {filtered.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onUpdated={(updated) => setProducts((prev) => prev.map((p) => p.id === updated.id ? updated : p))}
+              onDeleted={(id) => setProducts((prev) => prev.filter((p) => p.id !== id))}
+            />
+          ))}
         </div>
       )}
     </>
   );
 }
 
-// ── Orders Page (empty state — no seller orders endpoint) ──
+// ── Order status helpers ──
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "En attente",
+  CONFIRMED: "Confirmée",
+  PREPARING: "Préparation",
+  READY: "Prête",
+  DELIVERED: "Livrée",
+  CANCELLED: "Annulée",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  PENDING: "bg-[#FFF7ED] text-[#C2410C]",
+  CONFIRMED: "bg-[#EFF6FF] text-[#2563EB]",
+  PREPARING: "bg-[#F5F3FF] text-[#7C3AED]",
+  READY: "bg-[#F0FDF4] text-[#15803D]",
+  DELIVERED: "bg-[#DCFCE7] text-[#15803D]",
+  CANCELLED: "bg-[#FEE2E2] text-[#DC2626]",
+};
+
+const NEXT_STATUS: Record<string, string> = {
+  PENDING: "CONFIRMED",
+  CONFIRMED: "PREPARING",
+  PREPARING: "READY",
+  READY: "DELIVERED",
+};
+
+const NEXT_LABEL: Record<string, string> = {
+  PENDING: "Confirmer",
+  CONFIRMED: "En préparation",
+  PREPARING: "Prête",
+  READY: "Livrée",
+};
+
+// ── Orders Page ──
 
 export function OrdersPage() {
+  const [result, setResult] = useState<OrderListResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    getSellerOrders({ status: statusFilter !== "all" ? statusFilter : undefined, limit: 50 })
+      .then(setResult)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [statusFilter]);
+
+  const handleAdvance = async (order: Order) => {
+    const next = NEXT_STATUS[order.status];
+    if (!next) return;
+    setUpdating(order.id);
+    try {
+      await updateOrderStatus(order.id, next);
+      load();
+    } catch {
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  if (loading) return <LoadingSkeleton />;
+
+  const orders = result?.data ?? [];
+
   return (
     <>
-      <PageHeader title="Commandes" subtitle="Traitez les commandes entrantes et suivez les livraisons." />
-      <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes de vos clients apparaitront ici au fur et a mesure des achats." />
+      <PageHeader
+        title="Commandes"
+        subtitle="Traitez les commandes entrantes de vos clients."
+        action={
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-10 rounded-[10px] border border-[#E5E7EB] bg-white px-3 text-sm outline-none"
+          >
+            <option value="all">Tous les statuts</option>
+            {Object.entries(STATUS_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        }
+      />
+      {orders.length === 0 ? (
+        <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes de vos clients apparaitront ici au fur et a mesure des achats." />
+      ) : (
+        <div className="space-y-3">
+          {orders.map((order) => (
+            <div key={order.id} className="rounded-[16px] border border-[#E5E7EB] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-bold text-[#1F2937]">#{order.code}</p>
+                    <Badge className={`rounded-full px-3 py-1 text-xs ${STATUS_COLORS[order.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                      {STATUS_LABELS[order.status] ?? order.status}
+                    </Badge>
+                  </div>
+                  <p className="font-body mt-1 text-sm text-[#6B7280]">{order.customerName} · {order.customerPhone}</p>
+                  <p className="font-body mt-0.5 text-xs text-[#6B7280]">{order.deliveryAddress}</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <p className="text-xl font-extrabold text-[#22A849]">{order.total.toLocaleString()} F</p>
+                  <p className="font-body text-xs text-[#9CA3AF]">
+                    {new Date(order.createdAt).toLocaleDateString("fr-SN", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="font-body text-xs text-[#6B7280]">
+                  {order.items.length} article{order.items.length > 1 ? "s" : ""} · {order.items.map((i) => i.name).join(", ")}
+                </p>
+                <div className="flex gap-2">
+                  {NEXT_STATUS[order.status] && (
+                    <button
+                      disabled={updating === order.id}
+                      onClick={() => handleAdvance(order)}
+                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-[#22A849] px-3 text-xs font-bold text-white disabled:opacity-60"
+                    >
+                      {updating === order.id ? "…" : NEXT_LABEL[order.status]}
+                    </button>
+                  )}
+                  <Link
+                    href={`/vendeur/commandes/${order.id}`}
+                    className="inline-flex h-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] px-3 text-xs font-bold text-[#1F2937] hover:border-[#22A849]"
+                  >
+                    Détail
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
 
-// ── Order Detail Page (empty state) ──
+// ── Order Detail Page ──
 
 export function OrderDetailPage({ orderId }: { orderId: string }) {
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    // Find by id from orders list
+    getSellerOrders({ limit: 200 })
+      .then((res) => {
+        const found = res.data.find((o) => o.id === orderId || o.code === orderId);
+        setOrder(found ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [orderId]);
+
+  const handleAdvance = async () => {
+    if (!order) return;
+    const next = NEXT_STATUS[order.status];
+    if (!next) return;
+    setUpdating(true);
+    try {
+      const updated = await updateOrderStatus(order.id, next);
+      setOrder(updated);
+    } catch {
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) return <LoadingSkeleton />;
+
   return (
     <>
       <PageHeader
-        title={orderId}
-        subtitle="Detail de la commande"
-        action={<Link href="/vendeur/commandes" className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-4 text-sm font-bold text-[#1F2937]"><ArrowLeft size={16} /> Retour</Link>}
+        title={order ? `Commande #${order.code}` : orderId}
+        subtitle="Détail de la commande"
+        action={
+          <Link href="/vendeur/commandes" className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#E5E7EB] bg-white px-4 text-sm font-bold text-[#1F2937]">
+            <ArrowLeft size={16} /> Retour
+          </Link>
+        }
       />
-      <EmptyState icon={ShoppingBag} title="Commande introuvable" description="Les details de cette commande ne sont pas disponibles pour le moment." />
+      {!order ? (
+        <EmptyState icon={ShoppingBag} title="Commande introuvable" description="Les details de cette commande ne sont pas disponibles." />
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-4">
+            {/* Items */}
+            <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+              <h2 className="mb-4 text-lg font-bold text-[#1F2937]">Articles ({order.items.length})</h2>
+              <div className="space-y-3">
+                {order.items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 rounded-[14px] bg-[#FAFAFA] p-3">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[10px] bg-[#F1F5F9]">
+                      {item.product?.images?.[0]?.url && (
+                        <img src={item.product.images[0].url} alt={item.name} className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-[#1F2937]">{item.name}</p>
+                      <p className="font-body text-xs text-[#6B7280]">{item.quantity} × {item.unitPrice.toLocaleString()} F</p>
+                    </div>
+                    <p className="text-sm font-bold text-[#22A849]">{item.total.toLocaleString()} F</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-[#F1F1F1] pt-4">
+                <p className="font-semibold text-[#1F2937]">Total</p>
+                <p className="text-xl font-extrabold text-[#22A849]">{order.total.toLocaleString()} F</p>
+              </div>
+            </div>
+
+            {/* History */}
+            {order.history && order.history.length > 0 && (
+              <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+                <h2 className="mb-4 text-lg font-bold text-[#1F2937]">Historique</h2>
+                <div className="space-y-2">
+                  {order.history.map((h, i) => (
+                    <div key={i} className="flex items-center gap-3 text-sm">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[h.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                        {STATUS_LABELS[h.status] ?? h.status}
+                      </span>
+                      <span className="font-body text-[#6B7280]">
+                        {new Date(h.createdAt).toLocaleString("fr-SN")}
+                      </span>
+                      {h.note && <span className="text-[#9CA3AF]">— {h.note}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Side info */}
+          <aside className="space-y-4">
+            <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+              <h2 className="mb-4 text-lg font-bold text-[#1F2937]">Client</h2>
+              <div className="space-y-3">
+                <div className="rounded-[14px] bg-[#FAFAFA] p-3">
+                  <p className="font-body text-xs text-[#6B7280]">Nom</p>
+                  <p className="mt-0.5 font-semibold text-[#1F2937]">{order.customerName}</p>
+                </div>
+                <div className="rounded-[14px] bg-[#FAFAFA] p-3">
+                  <p className="font-body text-xs text-[#6B7280]">Téléphone</p>
+                  <p className="mt-0.5 font-semibold text-[#1F2937]">{order.customerPhone}</p>
+                </div>
+                <div className="rounded-[14px] bg-[#FAFAFA] p-3">
+                  <p className="font-body text-xs text-[#6B7280]">Adresse</p>
+                  <p className="mt-0.5 font-semibold text-[#1F2937]">{order.deliveryAddress}</p>
+                </div>
+                {order.note && (
+                  <div className="rounded-[14px] bg-[#FAFAFA] p-3">
+                    <p className="font-body text-xs text-[#6B7280]">Note</p>
+                    <p className="mt-0.5 font-semibold text-[#1F2937]">{order.note}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-[#1F2937]">Statut</h2>
+                <Badge className={`rounded-full px-3 py-1 text-xs ${STATUS_COLORS[order.status] ?? ""}`}>
+                  {STATUS_LABELS[order.status] ?? order.status}
+                </Badge>
+              </div>
+              {NEXT_STATUS[order.status] && (
+                <button
+                  disabled={updating}
+                  onClick={handleAdvance}
+                  className="mt-2 h-11 w-full rounded-[11px] bg-[#22A849] text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {updating ? "Mise à jour…" : `Passer à : ${STATUS_LABELS[NEXT_STATUS[order.status]]}`}
+                </button>
+              )}
+              {order.status === "DELIVERED" && (
+                <p className="mt-2 text-center font-body text-sm text-[#22A849] font-semibold">✓ Commande livrée</p>
+              )}
+              {order.status === "CANCELLED" && (
+                <p className="mt-2 text-center font-body text-sm text-[#DC2626] font-semibold">✗ Commande annulée</p>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
     </>
   );
 }
@@ -464,7 +864,8 @@ export function DeliveryPage() {
                 <label className="text-xs font-semibold text-[#6B7280]">Minimum commande</label>
                 <input className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849]" placeholder="10000 F" />
               </div>
-              <button className="h-11 w-full rounded-[11px] bg-[#22A849] text-sm font-bold text-white">Enregistrer zone</button>
+              <button disabled className="h-11 w-full rounded-[11px] bg-[#22A849]/60 text-sm font-bold text-white cursor-not-allowed" title="Fonctionnalité bientôt disponible">Enregistrer zone</button>
+              <p className="text-center font-body text-[10px] text-[#9CA3AF]">Zones de livraison — bientôt disponible</p>
             </div>
           </div>
 
@@ -562,19 +963,54 @@ export function StatsPage() {
 
 export function SettingsPage() {
   const [user, setUser] = useState<{ fullName: string; phone: string; email: string | null; role: string; status: string } | null>(null);
+  const [shop, setShop] = useState<{ name: string; description: string | null; phone: string | null; address: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  // Edit form state
+  const [shopName, setShopName] = useState("");
+  const [shopDesc, setShopDesc] = useState("");
+  const [shopPhone, setShopPhone] = useState("");
+  const [shopAddress, setShopAddress] = useState("");
 
   useEffect(() => {
-    getMe()
-      .then((u) => setUser(u))
-      .catch(() => {
-        try {
-          const stored = localStorage.getItem("gg-user");
-          if (stored) setUser(JSON.parse(stored));
-        } catch {}
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      getMe().catch(() => {
+        try { const s = localStorage.getItem("gg-user"); return s ? JSON.parse(s) : null; } catch { return null; }
+      }),
+      getMyShop().catch(() => null),
+    ]).then(([u, s]) => {
+      if (u) setUser(u);
+      if (s) {
+        setShop(s);
+        setShopName(s.name ?? "");
+        setShopDesc(s.description ?? "");
+        setShopPhone(s.phone ?? "");
+        setShopAddress(s.address ?? "");
+      }
+    }).finally(() => setLoading(false));
   }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError("");
+    try {
+      const updated = await updateMyShop({
+        name: shopName.trim() || undefined,
+        description: shopDesc.trim() || undefined,
+        phone: shopPhone.trim() || undefined,
+        address: shopAddress.trim() || undefined,
+      });
+      setShop(updated);
+      setEditing(false);
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : "Erreur lors de la sauvegarde");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) return <LoadingSkeleton />;
 
@@ -583,16 +1019,77 @@ export function SettingsPage() {
       <PageHeader title="Parametres" subtitle="Informations boutique, paiement et securite." />
       <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
         <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-          <h2 className="mb-5 text-lg font-bold text-[#1F2937]">Boutique</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <SettingBox icon={Store} label="Nom boutique" value={user?.fullName ?? "—"} />
-            <SettingBox icon={MapPin} label="Telephone" value={user?.phone ?? "—"} />
-            <SettingBox icon={User} label="Email" value={user?.email ?? "Non renseigne"} />
-            <SettingBox icon={ShieldCheck} label="Statut" value={user?.status === "ACTIVE" ? "Compte actif" : user?.status === "PENDING" ? "En attente" : user?.status ?? "—"} />
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-[#1F2937]">Ma boutique</h2>
+            {!editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border border-[#E5E7EB] px-3 text-xs font-bold text-[#1F2937] hover:border-[#22A849] hover:text-[#22A849]"
+              >
+                <Edit3 size={14} /> Modifier
+              </button>
+            )}
           </div>
-          <button className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] px-4 text-sm font-bold text-white">
-            <Edit3 size={15} /> Modifier boutique
-          </button>
+
+          {editing ? (
+            <div className="space-y-3">
+              {saveError && (
+                <div className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-600">{saveError}</div>
+              )}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#6B7280]">Nom de la boutique</label>
+                <input value={shopName} onChange={(e) => setShopName(e.target.value)}
+                  className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849]" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#6B7280]">Description</label>
+                <textarea value={shopDesc} onChange={(e) => setShopDesc(e.target.value)} rows={3}
+                  className="w-full rounded-[12px] border border-[#E5E7EB] px-3 py-2 text-sm outline-none focus:border-[#22A849] resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#6B7280]">Téléphone boutique</label>
+                  <input value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} type="tel"
+                    className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849]" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#6B7280]">Adresse</label>
+                  <input value={shopAddress} onChange={(e) => setShopAddress(e.target.value)}
+                    className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849]" />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button onClick={handleSave} disabled={saving}
+                  className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] text-sm font-bold text-white disabled:opacity-60">
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : <><Edit3 size={14} /> Enregistrer</>}
+                </button>
+                <button onClick={() => { setEditing(false); setSaveError(""); }}
+                  className="inline-flex h-10 flex-1 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-sm font-semibold text-[#6B7280]">
+                  Annuler
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              <SettingBox icon={Store} label="Nom boutique" value={shop?.name ?? user?.fullName ?? "—"} />
+              <SettingBox icon={MapPin} label="Téléphone" value={shop?.phone ?? user?.phone ?? "—"} />
+              <SettingBox icon={User} label="Email" value={user?.email ?? "Non renseigné"} />
+              <SettingBox icon={ShieldCheck} label="Statut"
+                value={user?.status === "ACTIVE" ? "Compte actif" : user?.status === "PENDING" ? "En attente de validation" : user?.status ?? "—"} />
+              {shop?.description && (
+                <div className="md:col-span-2 rounded-[14px] border border-[#F1F1F1] bg-[#FAFAFA] p-4">
+                  <p className="font-body text-xs text-[#6B7280]">Description</p>
+                  <p className="mt-1 text-sm text-[#1F2937]">{shop.description}</p>
+                </div>
+              )}
+              {shop?.address && (
+                <div className="md:col-span-2 rounded-[14px] border border-[#F1F1F1] bg-[#FAFAFA] p-4">
+                  <p className="font-body text-xs text-[#6B7280]">Adresse</p>
+                  <p className="mt-1 text-sm text-[#1F2937]">{shop.address}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">

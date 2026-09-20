@@ -11,7 +11,9 @@ import { RelayioService } from '../notifications/relayio.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { JoinTeamDto } from './dto/join-team.dto';
-import { StockType } from '@prisma/client';
+import { InviteMemberDto } from './dto/invite-member.dto';
+import { ChangeRoleDto } from './dto/change-role.dto';
+import { StockType, TeamRole } from '@prisma/client';
 
 @Injectable()
 export class TeamsService {
@@ -116,6 +118,15 @@ export class TeamsService {
       throw new ConflictException('Vous etes deja membre de cette equipe');
     }
 
+    // Verifier si l'utilisateur est deja dans une equipe (V1 : une seule equipe)
+    const currentMembership = await this.prisma.teamMember.findFirst({
+      where: { userId, removedAt: null },
+    });
+
+    if (currentMembership && currentMembership.teamId !== team.id) {
+      throw new ConflictException('Vous etes deja membre d\'une autre equipe. Quittez-la d\'abord.');
+    }
+
     // Verifier le nombre de membres (max 5)
     const memberCount = await this.prisma.teamMember.count({
       where: { teamId: team.id, removedAt: null },
@@ -179,6 +190,25 @@ export class TeamsService {
     });
   }
 
+  async changeMemberRole(teamId: string, memberId: string, dto: ChangeRoleDto, requestingUserId: string) {
+    const member = await this.prisma.teamMember.findFirst({
+      where: { id: memberId, teamId, removedAt: null },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Membre introuvable');
+    }
+
+    if (member.role === TeamRole.OWNER && dto.role !== TeamRole.OWNER) {
+      throw new ForbiddenException('Impossible de retirer le role proprietaire');
+    }
+
+    return this.prisma.teamMember.update({
+      where: { id: memberId },
+      data: { role: dto.role },
+    });
+  }
+
   async regenerateInviteCode(teamId: string) {
     const newCode = this.generateInviteCode();
 
@@ -194,7 +224,7 @@ export class TeamsService {
    * Genere un code d'invitation et l'envoie par WhatsApp si RelayIO est configure.
    * Sinon, retourne le code pour partage manuel.
    */
-  async inviteMember(teamId: string, phone: string) {
+  async inviteMember(teamId: string, dto: InviteMemberDto) {
     const team = await this.prisma.team.findFirst({
       where: { id: teamId, deletedAt: null },
     });
@@ -213,31 +243,34 @@ export class TeamsService {
       });
     }
 
+    const role = dto.role || TeamRole.MEMBER;
+
     // Tenter l'envoi par WhatsApp via RelayIO
     let sentViaWhatsApp = false;
     if (this.relayioService.isConfigured()) {
       try {
-        await this.relayioService.sendInviteCode(phone, inviteCode, team.name);
+        await this.relayioService.sendInviteCode(dto.phone, inviteCode, team.name);
         sentViaWhatsApp = true;
-        this.logger.log(`Invitation envoyee par WhatsApp a ${phone} pour l'equipe ${team.name}`);
+        this.logger.log(`Invitation envoyee par WhatsApp a ${dto.phone} pour l'equipe ${team.name}`);
       } catch (error) {
-        this.logger.error(`Echec envoi WhatsApp a ${phone}: ${error.message}`);
+        this.logger.error(`Echec envoi WhatsApp a ${dto.phone}: ${(error as Error).message}`);
       }
     } else {
       this.logger.log(
-        `RelayIO non configure — code d'invitation ${inviteCode} a partager manuellement avec ${phone}`,
+        `RelayIO non configure — code d'invitation ${inviteCode} a partager manuellement avec ${dto.phone}`,
       );
     }
 
     return {
       inviteCode,
       teamName: team.name,
-      phone,
+      phone: dto.phone,
+      role,
       sentViaWhatsApp,
     };
   }
 
-  private generateInviteCode(): string {
+  generateInviteCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for (let i = 0; i < 8; i++) {

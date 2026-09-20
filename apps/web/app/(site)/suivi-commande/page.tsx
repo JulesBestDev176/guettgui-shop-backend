@@ -110,10 +110,6 @@ export default function SuiviCommandePage() {
               <span className="text-xs text-muted">Sous-total</span>
               <span className="text-sm font-semibold">{order.subtotal.toLocaleString()} F</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">Livraison</span>
-              <span className="text-sm font-semibold">{order.deliveryFee.toLocaleString()} F</span>
-            </div>
             <div className="mt-1 flex items-center justify-between border-t border-gray-100 pt-2">
               <span className="text-sm font-bold">Total</span>
               <span className="text-base font-bold text-brand">{order.total.toLocaleString()} F</span>

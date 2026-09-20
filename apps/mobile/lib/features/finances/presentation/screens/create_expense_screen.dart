@@ -1,26 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
+import 'package:guettgui_mobile/features/finances/presentation/providers/finance_provider.dart';
+import 'package:guettgui_mobile/features/flocks/presentation/providers/flock_provider.dart';
 import 'package:guettgui_mobile/shared/extensions/context_extensions.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_button.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_text_field.dart';
 
-class CreateExpenseScreen extends StatefulWidget {
+class CreateExpenseScreen extends ConsumerStatefulWidget {
   const CreateExpenseScreen({super.key});
 
   @override
-  State<CreateExpenseScreen> createState() => _CreateExpenseScreenState();
+  ConsumerState<CreateExpenseScreen> createState() =>
+      _CreateExpenseScreenState();
 }
 
-class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
+class _CreateExpenseScreenState extends ConsumerState<CreateExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   String? _category;
   String? _flock;
   DateTime _date = DateTime.now();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -45,14 +51,48 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.showSuccessSnackBar('Depense enregistree.');
-    context.pop();
+
+    final teamIdAsync = ref.read(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+    if (teamId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier =
+          ref.read(financeNotifierProvider(teamId).notifier);
+      await notifier.createExpense({
+        'category': _category,
+        'amount': int.parse(_amountController.text.trim()),
+        'description': _descController.text.trim(),
+        'date': _date.toIso8601String(),
+        if (_flock != null) 'flockId': _flock,
+      });
+
+      if (mounted) {
+        context.showSuccessSnackBar('Depense enregistree.');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSuccessSnackBar('Erreur: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final teamIdAsync = ref.watch(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+
+    final flocksAsync =
+        teamId != null ? ref.watch(flockListProvider(teamId)) : null;
+    final flocks = flocksAsync?.valueOrNull ?? [];
+
     return Scaffold(
       backgroundColor: AppColors.ivory,
       appBar: AppBar(title: const Text(AppStrings.addExpense)),
@@ -86,7 +126,8 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                   labelText: AppStrings.category,
                   prefixIcon: Icon(Icons.category),
                 ),
-                validator: (v) => v == null ? 'Selectionnez une categorie' : null,
+                validator: (v) =>
+                    v == null ? 'Selectionnez une categorie' : null,
                 items: const [
                   DropdownMenuItem(
                     value: 'ALIMENTATION',
@@ -144,8 +185,12 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.payments,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Montant requis';
-                  if (int.tryParse(v.trim()) == null) return 'Montant invalide';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Montant requis';
+                  }
+                  if (int.tryParse(v.trim()) == null) {
+                    return 'Montant invalide';
+                  }
                   return null;
                 },
                 onChanged: (_) => setState(() {}),
@@ -159,27 +204,20 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                   labelText: 'Lot (optionnel)',
                   prefixIcon: Icon(Icons.pets),
                 ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'flock_1',
-                    child: Text('Goliath - Noyau 1'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'flock_2',
-                    child: Text('Pondeuses #3'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'flock_3',
-                    child: Text('Chair - Lot 12'),
-                  ),
-                ],
+                items: flocks
+                    .map((f) => DropdownMenuItem(
+                          value: f.id,
+                          child: Text(f.name),
+                        ))
+                    .toList(),
                 onChanged: (v) => setState(() => _flock = v),
               ),
               const SizedBox(height: AppDimensions.space32),
 
               GGButton(
                 label: AppStrings.save,
-                onPressed: _isFormValid ? _submit : null,
+                onPressed:
+                    _isFormValid && !_isSaving ? _submit : null,
               ),
             ],
           ),

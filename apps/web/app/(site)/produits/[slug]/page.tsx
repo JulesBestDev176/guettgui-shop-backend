@@ -2,11 +2,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Check, ChevronLeft, Loader2, Lock, MapPin, Minus, Plus, ShoppingCart, Star, Truck } from "lucide-react";
+import {
+  Check, ChevronLeft, Heart, Loader2, Lock,
+  MapPin, MessageCircle, Minus, Package, Plus, Share2, Star,
+} from "lucide-react";
 import { Badge } from "@/components/ui/primitives";
 import { ProductCard } from "@/components/product-card";
-import { getProduct, getRelatedProducts } from "@/lib/api";
-import { productImages } from "@/lib/product-images";
+import { getProduct, getRelatedProducts, toggleFavorite, createReview } from "@/lib/api";
 import type { Product } from "@/lib/types";
 
 export default function ProductPage() {
@@ -17,13 +19,25 @@ export default function ProductPage() {
   const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [liked, setLiked] = useState(false);
+  const [shared, setShared] = useState(false);
 
   const [activeImg, setActiveImg] = useState(0);
   const [activeOption, setActiveOption] = useState(0);
   const [qty, setQty] = useState(1);
 
+  // Review form
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewDone, setReviewDone] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLoggedIn(!!localStorage.getItem("gg-token"));
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     setError("");
     Promise.all([getProduct(slug), getRelatedProducts(slug)])
@@ -34,6 +48,27 @@ export default function ProductPage() {
       .catch((err) => setError(err.message || "Produit introuvable"))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  const handleFavorite = async () => {
+    if (!product) return;
+    try {
+      const res = await toggleFavorite(product.id);
+      setLiked(res.favorited);
+    } catch {
+      setLiked((v) => !v);
+    }
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      await navigator.share({ title: product?.name, url }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    }
+  };
 
   if (loading) {
     return (
@@ -47,15 +82,17 @@ export default function ProductPage() {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="mb-3 text-xl font-bold text-ink">Produit introuvable</h1>
-        <p className="mb-6 text-sm text-muted">{error || "Ce produit n'existe pas ou a ete retire."}</p>
-        <Link href="/catalogue" className="text-sm font-semibold text-brand hover:underline">Retour au catalogue</Link>
+        <p className="mb-6 text-sm text-muted">{error || "Ce produit n'existe pas ou a été retiré."}</p>
+        <Link href="/catalogue" className="text-sm font-semibold text-brand hover:underline">
+          Retour au catalogue
+        </Link>
       </div>
     );
   }
 
   const gallery = product.images.length > 0
     ? product.images.sort((a, b) => a.sortOrder - b.sortOrder).map((img) => img.url)
-    : [productImages.wholeChicken];
+    : [];
 
   const priceOptions = product.priceOptions ?? [];
   const hasPriceOptions = priceOptions.length > 0;
@@ -63,14 +100,34 @@ export default function ProductPage() {
   const totalPrice = currentPrice * qty;
 
   const reviews = product.reviews ?? [];
-  const avgRating = reviews.length > 0
-    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-    : null;
+  const avgRating = product.ratingAvg > 0 ? product.ratingAvg.toFixed(1) : null;
+
+  const shopLocation = product.shop?.city?.name ?? product.shop?.region?.name ?? "Sénégal";
+  const shopPhone = product.shop?.phone;
+
+  // WhatsApp message
+  const waMessage = encodeURIComponent(
+    `Bonjour, je suis intéressé par votre produit "${product.name}" (${currentPrice.toLocaleString("fr-SN")} FCFA) disponible sur Guett Gui. Pouvez-vous me donner plus d'informations ?`
+  );
+  const waNumber = shopPhone?.replace(/\D/g, "") ?? "";
+  const waUrl = waNumber ? `https://wa.me/${waNumber}?text=${waMessage}` : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 md:px-6">
       <div className="font-body mb-4 text-xs text-muted">
-        Accueil · Catalogue · {product.category?.name ?? "Produit"} · <span className="text-ink">{product.name}</span>
+        <Link href="/" className="hover:text-brand">Accueil</Link>
+        {" · "}
+        <Link href="/catalogue" className="hover:text-brand">Catalogue</Link>
+        {" · "}
+        {product.category?.name && (
+          <>
+            <Link href={`/catalogue?categoryId=${product.category.id}`} className="hover:text-brand">
+              {product.category.name}
+            </Link>
+            {" · "}
+          </>
+        )}
+        <span className="text-ink">{product.name}</span>
       </div>
 
       <Link href="/catalogue" className="mb-4 flex w-fit items-center gap-1.5 text-sm font-medium text-muted hover:text-brand md:hidden">
@@ -79,11 +136,24 @@ export default function ProductPage() {
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-2">
+        {/* Gallery */}
         <div>
           <div className="relative aspect-[1/.92] overflow-hidden rounded-xl bg-page">
-            <img src={gallery[activeImg]} alt={product.name} className="h-full w-full object-cover" />
-            <span className="absolute left-3 top-3 rounded-lg bg-brand px-3 py-1.5 text-[11px] font-semibold text-white">{product.category?.name}</span>
-            <span className="absolute bottom-3 right-3 rounded-lg bg-ink/70 px-3 py-1.5 text-[11px] font-medium text-white">{activeImg + 1} / {gallery.length}</span>
+            {gallery.length > 0 ? (
+              <img src={gallery[activeImg]} alt={product.name} className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full bg-gradient-to-br from-brand-soft to-green-100 flex items-center justify-center">
+                <Package size={64} className="text-brand/30" />
+              </div>
+            )}
+            <span className="absolute left-3 top-3 rounded-lg bg-brand px-3 py-1.5 text-[11px] font-semibold text-white">
+              {product.category?.name}
+            </span>
+            {gallery.length > 0 && (
+              <span className="absolute bottom-3 right-3 rounded-lg bg-ink/70 px-3 py-1.5 text-[11px] font-medium text-white">
+                {activeImg + 1} / {gallery.length}
+              </span>
+            )}
           </div>
 
           {gallery.length > 1 && (
@@ -94,7 +164,7 @@ export default function ProductPage() {
                   onClick={() => setActiveImg(index)}
                   className={`aspect-square w-16 shrink-0 sm:flex-1 sm:w-auto overflow-hidden rounded-lg border-2 ${activeImg === index ? "border-brand" : "border-transparent"}`}
                 >
-                  <img src={image} alt={`Vue produit ${index + 1}`} className="h-full w-full object-cover" />
+                  <img src={image} alt={`Vue ${index + 1}`} className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -108,23 +178,40 @@ export default function ProductPage() {
           </div>
         </div>
 
+        {/* Details */}
         <div>
           <div className="mb-3 flex items-center gap-2">
-            <Badge className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] text-brand-dark">
+            <Badge className={`rounded-full px-2.5 py-1 text-[11px] flex items-center gap-1 ${product.status === "ACTIVE" ? "bg-brand-soft text-brand-dark" : "bg-gray-100 text-gray-600"}`}>
               <Check size={12} />
-              {product.status === "ACTIVE" ? `En stock · ${product.stock} disponibles` : "Indisponible"}
+              {product.status === "ACTIVE"
+                ? `En stock · ${product.stock} disponibles`
+                : product.status === "OUT_OF_STOCK"
+                ? "Rupture de stock"
+                : "Indisponible"}
             </Badge>
+            {product.badge && (
+              <Badge className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] text-orange-600">
+                {product.badge}
+              </Badge>
+            )}
           </div>
 
-          <h1 className="mb-2.5 text-2xl font-bold leading-tight text-ink md:text-3xl">{product.name}</h1>
+          <h1 className="mb-2.5 text-2xl font-bold leading-tight text-ink md:text-3xl">
+            {product.name}
+          </h1>
+
           <div className="font-body mb-5 flex flex-wrap items-center gap-3 text-[13px] text-muted">
             {avgRating && (
               <span className="flex items-center gap-1.5 font-semibold text-ink">
-                <Star size={15} className="fill-amber-400 text-amber-400" />{avgRating}
+                <Star size={15} className="fill-amber-400 text-amber-400" />
+                {avgRating}
               </span>
             )}
-            {reviews.length > 0 && <span>· {reviews.length} avis</span>}
-            <span className="flex items-center gap-1.5"><MapPin size={14} className="text-muted" />{product.city}</span>
+            {product.reviewCount > 0 && <span>· {product.reviewCount} avis</span>}
+            <span className="flex items-center gap-1.5">
+              <MapPin size={14} className="text-muted" />
+              {shopLocation}
+            </span>
           </div>
 
           {hasPriceOptions && (
@@ -138,7 +225,9 @@ export default function ProductPage() {
                     className={`rounded-lg border-2 p-3 text-center ${activeOption === index ? "border-brand bg-brand-soft" : "border-gray-200"}`}
                   >
                     <span className="block text-[13px] font-semibold">{option.label}</span>
-                    <span className={`mt-1 block text-base font-bold ${activeOption === index ? "text-brand" : "text-ink"}`}>{option.price.toLocaleString()} F</span>
+                    <span className={`mt-1 block text-base font-bold ${activeOption === index ? "text-brand" : "text-ink"}`}>
+                      {option.price.toLocaleString("fr-SN")} F
+                    </span>
                   </button>
                 ))}
               </div>
@@ -148,62 +237,106 @@ export default function ProductPage() {
           <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-white p-4 sm:p-5 shadow-sm">
             <div className="min-w-0">
               <p className="font-body text-xs text-muted">Prix total</p>
-              <p className="text-2xl sm:text-3xl font-extrabold leading-none text-brand">{totalPrice.toLocaleString()} <span className="text-sm sm:text-base font-semibold">FCFA</span></p>
+              <p className="text-2xl sm:text-3xl font-extrabold leading-none text-brand">
+                {totalPrice.toLocaleString("fr-SN")} <span className="text-sm sm:text-base font-semibold">FCFA</span>
+              </p>
             </div>
             <div className="flex shrink-0 overflow-hidden rounded-lg border border-gray-200">
-              <button onClick={() => setQty(Math.max(1, qty - 1))} className="flex h-11 w-11 items-center justify-center text-muted"><Minus size={16} /></button>
-              <span className="flex h-11 w-10 items-center justify-center border-x border-gray-200 text-base font-bold">{qty}</span>
-              <button onClick={() => setQty(qty + 1)} className="flex h-11 w-11 items-center justify-center text-brand"><Plus size={16} /></button>
+              <button onClick={() => setQty(Math.max(1, qty - 1))} className="flex h-11 w-11 items-center justify-center text-muted">
+                <Minus size={16} />
+              </button>
+              <span className="flex h-11 w-10 items-center justify-center border-x border-gray-200 text-base font-bold">
+                {qty}
+              </span>
+              <button onClick={() => setQty(qty + 1)} className="flex h-11 w-11 items-center justify-center text-brand">
+                <Plus size={16} />
+              </button>
             </div>
           </div>
 
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row">
-            <Link href="/checkout" className="flex h-12 min-h-[48px] flex-[1.4] items-center justify-center rounded-lg bg-brand text-[15px] font-bold text-white">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/checkout"
+              className="flex h-12 min-h-[48px] flex-[1.4] items-center justify-center rounded-lg bg-brand text-[15px] font-bold text-white"
+            >
               Commander maintenant
             </Link>
-            <Link href="/panier" className="flex h-12 min-h-[48px] flex-1 items-center justify-center gap-2 rounded-lg border-2 border-brand bg-white text-[15px] font-semibold text-brand">
-              <ShoppingCart size={17} />
-              Panier
-            </Link>
+            {waUrl && (
+              <a
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-12 min-h-[48px] flex-1 items-center justify-center gap-2 rounded-lg bg-[#25D366] text-[15px] font-bold text-white"
+              >
+                <MessageCircle size={18} />
+                WhatsApp
+              </a>
+            )}
           </div>
 
-          <div className="mb-4 rounded-xl bg-brand-soft p-4 text-brand-dark">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <Truck size={17} />
-              Livraison disponible
-            </div>
-            <p className="font-body text-xs leading-6">
-              Depuis <strong>{product.city}</strong> · {product.unit}
-            </p>
+          {/* Favorite + Share */}
+          <div className="mb-4 flex gap-2">
+            <button
+              onClick={handleFavorite}
+              className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition ${
+                liked ? "border-red-300 bg-red-50 text-red-500" : "border-border bg-white text-muted hover:border-brand hover:text-brand"
+              }`}
+            >
+              <Heart size={16} className={liked ? "fill-red-500" : ""} />
+              {liked ? "Sauvegardé" : "Sauvegarder"}
+            </button>
+            <button
+              onClick={handleShare}
+              className="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-white text-sm font-semibold text-muted hover:border-brand hover:text-brand transition"
+            >
+              <Share2 size={16} />
+              {shared ? "Lien copié !" : "Partager"}
+            </button>
           </div>
 
+          {/* Shop card */}
           <div className="rounded-xl bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-lg font-bold text-brand-dark">
-                {product.seller?.shopName?.slice(0, 2).toUpperCase() ?? "VD"}
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold ${product.shop?.avatarUrl ? "" : "bg-brand-soft text-brand-dark"}`}>
+                {product.shop?.avatarUrl ? (
+                  <img src={product.shop.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  product.shop?.name?.slice(0, 2).toUpperCase() ?? "VD"
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">{product.seller?.shopName ?? "Vendeur"}</h3>
-                  <Badge className="rounded-full bg-brand-soft text-[9.5px] text-brand-dark">Verifie</Badge>
+                  <h3 className="font-semibold">{product.shop?.name ?? "Vendeur"}</h3>
+                  {product.shop?.verified && (
+                    <Badge className="rounded-full bg-brand-soft text-[9.5px] text-brand-dark">Vérifié</Badge>
+                  )}
                 </div>
-                <p className="font-body text-xs text-muted">Eleveur · {product.seller?.city ?? product.city}</p>
+                <p className="font-body text-xs text-muted">
+                  Éleveur · {shopLocation}
+                </p>
               </div>
-              <button className="hidden rounded-lg bg-page px-3.5 py-2 text-xs font-semibold md:block">Contacter</button>
+              <Link
+                href={`/boutiques/${product.shop?.slug ?? ""}`}
+                className="hidden rounded-lg bg-page px-3.5 py-2 text-xs font-semibold hover:bg-brand-soft hover:text-brand md:block transition"
+              >
+                Voir boutique
+              </Link>
             </div>
             <p className="font-body mt-3 flex items-center gap-1.5 text-[11px] text-muted">
               <Lock size={12} />
-              Le numero du vendeur reste masque tant que la commande n&apos;est pas passee.
+              Le numéro du vendeur reste masqué tant que la commande n&apos;est pas passée.
             </p>
           </div>
         </div>
       </div>
 
       {/* Reviews */}
-      {reviews.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-4 text-xl font-bold">Avis clients ({reviews.length})</h2>
-          <div className="space-y-3">
+      <section className="mt-10">
+        <h2 className="mb-4 text-xl font-bold">
+          Avis clients{reviews.length > 0 && ` (${reviews.length})`}
+        </h2>
+        {reviews.length > 0 && (
+          <div className="mb-6 space-y-3">
             {reviews.map((review) => (
               <div key={review.id} className="rounded-xl bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-2">
@@ -212,14 +345,58 @@ export default function ProductPage() {
                       <Star key={i} size={13} className={i < review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"} />
                     ))}
                   </div>
-                  <span className="text-xs font-semibold text-ink">{review.user.fullName}</span>
+                  <span className="text-xs font-semibold text-ink">{review.user?.fullName ?? "Client"}</span>
                 </div>
-                {review.comment && <p className="font-body mt-2 text-sm text-muted">{review.comment}</p>}
+                {review.comment && (
+                  <p className="font-body mt-2 text-sm text-muted">{review.comment}</p>
+                )}
               </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
+
+        {/* Submit review */}
+        {isLoggedIn && product && !reviewDone && (
+          <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+            <h3 className="mb-4 font-bold">Laisser un avis</h3>
+            <div className="mb-3 flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} onClick={() => setReviewRating(n)}>
+                  <Star size={24} className={n <= reviewRating ? "fill-amber-400 text-amber-400" : "text-gray-300"} />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              rows={3}
+              placeholder="Votre avis sur ce produit..."
+              className="w-full rounded-xl border border-border bg-page px-4 py-3 font-body text-sm text-ink outline-none focus:border-brand resize-none"
+            />
+            <button
+              disabled={reviewRating === 0 || reviewSubmitting}
+              onClick={async () => {
+                if (!product || reviewRating === 0) return;
+                setReviewSubmitting(true);
+                try {
+                  await createReview({ productId: product.id, rating: reviewRating, comment: reviewComment.trim() || undefined });
+                  setReviewDone(true);
+                } catch {} finally {
+                  setReviewSubmitting(false);
+                }
+              }}
+              className="mt-3 flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {reviewSubmitting ? <Loader2 size={15} className="animate-spin" /> : "Publier mon avis"}
+            </button>
+          </div>
+        )}
+        {reviewDone && (
+          <div className="flex items-center gap-2 rounded-xl bg-brand-soft px-4 py-3 text-sm font-semibold text-brand">
+            <Check size={16} /> Merci pour votre avis !
+          </div>
+        )}
+      </section>
 
       {related.length > 0 && (
         <section className="mt-10">
@@ -232,8 +409,8 @@ export default function ProductPage() {
                 name={p.name}
                 price={p.basePrice}
                 category={p.category?.name}
-                vendor={p.seller?.shopName ?? "Vendeur"}
-                city={p.city}
+                vendor={p.shop?.name ?? "Éleveur"}
+                city={p.shop?.city?.name ?? p.shop?.region?.name}
                 image={p.images?.[0]?.url}
               />
             ))}

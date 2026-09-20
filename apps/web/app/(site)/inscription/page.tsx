@@ -2,15 +2,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, User, Store, Bike, Loader2 } from "lucide-react";
+import { ArrowRight, User, Store, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/primitives";
 import { register } from "@/lib/api";
 
 const profiles = [
-  { id: "client", role: "CLIENT", icon: User, label: "Client", desc: "Acheter des produits" },
+  { id: "client", role: "BUYER", icon: User, label: "Acheteur", desc: "Acheter des produits" },
   { id: "vendeur", role: "SELLER", icon: Store, label: "Vendeur", desc: "Vendre mes produits" },
-  { id: "livreur", role: "DELIVERY", icon: Bike, label: "Livreur", desc: "Livrer les commandes" },
 ];
 
 export default function InscriptionPage() {
@@ -39,12 +38,11 @@ export default function InscriptionPage() {
         email: email || undefined,
         password,
         role: selectedProfile.role,
+        shopName: selectedProfile.role === "SELLER" ? shopName || fullName : undefined,
       });
       const role = result.user.role;
       if (role === "SELLER") {
         router.push("/vendeur");
-      } else if (role === "DELIVERY") {
-        router.push("/client");
       } else {
         router.push("/client");
       }
@@ -71,7 +69,7 @@ export default function InscriptionPage() {
       )}
 
       {/* Profile selector */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6">
         {profiles.map(({ id, icon: Icon, label, desc }) => (
           <button
             key={id}

@@ -53,52 +53,9 @@ final authStateProvider =
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
 
-  /// Passer a false pour utiliser le vrai backend au lieu des donnees mock.
-  bool _useMockData = true;
-
-  static final _mockUser = User(
-    id: 'mock-user',
-    phone: '+221771234567',
-    firstName: 'Amadou',
-    lastName: 'Diallo',
-    teamId: 'mock-team-001',
-    teamName: 'FERME NDIAYE BI',
-    role: 'OWNER',
-    createdAt: DateTime.now(),
-  );
-
-  AuthNotifier(this._repository)
-      : super(AuthState(
-          user: User(
-            id: 'mock-user',
-            phone: '+221771234567',
-            firstName: 'Amadou',
-            lastName: 'Diallo',
-            teamId: 'mock-team-001',
-            teamName: 'FERME NDIAYE BI',
-            role: 'OWNER',
-            createdAt: DateTime.now(),
-          ),
-          isAuthenticated: true,
-        ));
-
-  /// Active ou desactive le mode mock.
-  void setUseMockData(bool value) {
-    _useMockData = value;
-    if (_useMockData) {
-      state = AuthState(user: _mockUser, isAuthenticated: true);
-    } else {
-      state = const AuthState();
-    }
-  }
-
-  bool get useMockData => _useMockData;
+  AuthNotifier(this._repository) : super(const AuthState());
 
   Future<void> checkAuth() async {
-    if (_useMockData) {
-      state = AuthState(user: _mockUser, isAuthenticated: true);
-      return;
-    }
     state = state.copyWith(isLoading: true);
     try {
       final isAuthenticated = await _repository.isAuthenticated();
@@ -117,10 +74,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> sendOtp(String phone) async {
-    if (_useMockData) {
-      state = state.copyWith(isLoading: false);
-      return;
-    }
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _repository.sendOtp(phone);
@@ -131,10 +84,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<bool> verifyOtp(String phone, String code) async {
-    if (_useMockData) {
-      state = AuthState(user: _mockUser, isAuthenticated: true);
-      return false;
-    }
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await _repository.verifyOtp(phone, code);
@@ -153,13 +102,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String firstName,
     required String lastName,
   }) async {
-    if (_useMockData) {
-      state = state.copyWith(
-        isLoading: false,
-        user: _mockUser.copyWith(firstName: firstName, lastName: lastName),
-      );
-      return;
-    }
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _repository.updateProfile(
@@ -182,39 +124,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String name,
     required String location,
   }) async {
-    if (_useMockData) {
-      state = state.copyWith(isLoading: false);
-      return;
-    }
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _repository.createTeam(name: name, location: location);
-      state = state.copyWith(isLoading: false);
+      // Refresh user to get teamId
+      await checkAuth();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> joinTeam(String inviteCode) async {
-    if (_useMockData) {
-      state = state.copyWith(isLoading: false);
-      return;
-    }
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _repository.joinTeam(inviteCode);
-      state = state.copyWith(isLoading: false);
+      // Refresh user to get teamId
+      await checkAuth();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> logout() async {
-    if (_useMockData) {
-      state = const AuthState();
-      return;
+    try {
+      await _repository.logout();
+    } catch (_) {
+      // Ignore server errors during logout
     }
-    await _repository.logout();
     state = const AuthState();
   }
 

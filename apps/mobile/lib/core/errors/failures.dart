@@ -16,9 +16,9 @@ class CacheFailure extends Failure {
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure(
-    [super.message = 'Pas de connexion Internet. Verifiez votre reseau.'],
-  );
+  const NetworkFailure([
+    String message = 'Pas de connexion Internet. Verifiez votre reseau.',
+  ]) : super(message);
 }
 
 class ValidationFailure extends Failure {

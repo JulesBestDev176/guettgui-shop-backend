@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RelayioService } from '../notifications/relayio.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -20,6 +21,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly relayioService: RelayioService,
   ) {}
 
   async sendOtp(dto: SendOtpDto) {
@@ -48,8 +50,16 @@ export class AuthService {
       },
     });
 
-    // Envoyer via Relayio (mock en dev)
-    await this.sendOtpViaRelayio(phone, code);
+    // Envoyer via RelayIO si configure, sinon logger en console
+    if (this.relayioService.isConfigured()) {
+      try {
+        await this.relayioService.sendOtp(phone, code);
+      } catch (error) {
+        this.logger.error(`Echec envoi OTP via RelayIO a ${phone}: ${(error as Error).message}`);
+      }
+    } else {
+      this.logger.warn(`[DEV] Code OTP pour ${phone}: ${code}`);
+    }
 
     return { message: 'Code OTP envoye avec succes' };
   }
@@ -166,7 +176,7 @@ export class AuthService {
     return { message: 'Deconnexion reussie' };
   }
 
-  private generateOtpCode(): string {
+  generateOtpCode(): string {
     // En dev, utiliser un code fixe pour faciliter les tests
     if (this.configService.get('NODE_ENV') === 'development') {
       this.logger.debug('Mode developpement : OTP fixe = 123456');
@@ -175,7 +185,7 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  private async generateTokens(userId: string, phone: string) {
+  async generateTokens(userId: string, phone: string) {
     const payload = { sub: userId, phone };
 
     const accessToken = this.jwtService.sign(payload, {
@@ -200,17 +210,5 @@ export class AuthService {
       accessToken,
       refreshToken: refreshTokenValue,
     };
-  }
-
-  private async sendOtpViaRelayio(phone: string, code: string): Promise<void> {
-    const isDev = this.configService.get('NODE_ENV') === 'development';
-    if (isDev) {
-      this.logger.debug(`[MOCK RELAYIO] OTP pour ${phone}: ${code}`);
-      return;
-    }
-
-    // En production, appeler l'API Relayio
-    this.logger.log(`Envoi OTP a ${phone} via Relayio`);
-    // TODO: Implementer l'appel HTTP reel a Relayio
   }
 }

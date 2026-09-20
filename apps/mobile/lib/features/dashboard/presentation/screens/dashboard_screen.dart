@@ -1,15 +1,15 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/router/app_router.dart';
 import 'package:guettgui_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:guettgui_mobile/features/dashboard/presentation/providers/dashboard_provider.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_amount_card.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_app_bar.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_member_card.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_stat_card.dart';
+import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -17,6 +17,22 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).user;
+    final statsAsync = ref.watch(dashboardStatsProvider);
+    final flocksAsync = ref.watch(activeFlocksSummaryProvider);
+    final alertsAsync = ref.watch(activeAlertsProvider);
+
+    final stats = statsAsync.valueOrNull;
+    final flocks = flocksAsync.valueOrNull ?? [];
+    final alerts = alertsAsync.valueOrNull ?? [];
+
+    final eggsToday = stats?.eggsToday ?? 0;
+    final totalEffective = stats?.totalEffective ?? 0;
+    final totalRevenue = stats?.totalRevenue ?? 0;
+    final revenueTrend = stats?.revenueTrend;
+    final alertCount = alerts.length;
+
+    final now = DateTime.now();
+    final dateStr = DateFormat('d MMMM yyyy', 'fr_FR').format(now);
 
     return Scaffold(
       backgroundColor: AppColors.ivory,
@@ -26,8 +42,8 @@ class DashboardScreen extends ConsumerWidget {
             // App bar 48px
             GGAppBar(
               role: user?.isOwner == true ? 'Proprietaire' : 'Membre',
-              alertCount: 3,
-              notificationCount: 5,
+              alertCount: alertCount,
+              notificationCount: 0,
               onAlertTap: () => context.push(AppRoutes.notifications),
               onNotificationTap: () => context.push(AppRoutes.notifications),
               onProfileTap: () => context.go(AppRoutes.profile),
@@ -35,172 +51,195 @@ class DashboardScreen extends ConsumerWidget {
 
             // Body: ListView padding 16 16 16 110
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-                children: [
-                  // Date 11px alpha0.45
-                  Text(
-                    '30 aout 2026',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textMeta,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(dashboardStatsProvider);
+                  ref.invalidate(activeFlocksSummaryProvider);
+                  ref.invalidate(activeAlertsProvider);
+                },
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+                  children: [
+                    // Date 11px alpha0.45
+                    Text(
+                      dateStr,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMeta,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Greeting 24px w600
-                  Text(
-                    'Bonjour, ${user?.displayName ?? 'Amadou'}',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.night,
+                    const SizedBox(height: 4),
+                    // Greeting 24px w600
+                    Text(
+                      'Bonjour, ${user?.displayName ?? ''}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.night,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // MemberCard COMPACT
-                  GGMemberCard(
-                    farmName: user?.teamName ?? 'FERME NDIAYE BI',
-                    userName: user?.fullName ?? 'Amadou Diallo',
-                    role: user?.isOwner == true
-                        ? 'Proprietaire'
-                        : 'Membre',
-                  ),
-                  const SizedBox(height: 16),
+                    // MemberCard COMPACT
+                    GGMemberCard(
+                      farmName: user?.teamName ?? '',
+                      userName: user?.fullName ?? '',
+                      role: user?.isOwner == true
+                          ? 'Proprietaire'
+                          : 'Membre',
+                    ),
+                    const SizedBox(height: 16),
 
-                  // 2 KPI glass cards in Row, gap 12px, 100px height
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GGStatCard(
-                          label: 'Ponte du jour',
-                          value: '142',
-                          icon: Icons.egg_outlined,
-                          iconBackgroundColor:
-                              AppColors.warning.withValues(alpha: 0.10),
-                          iconColor: AppColors.warning,
-                          suffix: 'oeufs',
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GGStatCard(
-                          label: 'Effectif total',
-                          value: '520',
-                          icon: Icons.pets_outlined,
-                          iconBackgroundColor:
-                              AppColors.primary.withValues(alpha: 0.10),
-                          iconColor: AppColors.primary,
-                          suffix: 'sujets',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Amount card full width
-                  GGAmountCard(
-                    label: 'Total revenus (2026)',
-                    amountText: '2 450 000',
-                    icon: Icons.payments_outlined,
-                    trendText: '+12%',
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Section header "Lots actifs" + "Voir tout"
-                  Row(
-                    children: [
-                      const Text(
-                        'Lots actifs',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.night,
-                        ),
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => context.go(AppRoutes.flocks),
-                        child: const Text(
-                          'Voir tout',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                    // 2 KPI glass cards in Row, gap 12px, 100px height
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GGStatCard(
+                            label: 'Ponte du jour',
+                            value: '$eggsToday',
+                            icon: Icons.egg_outlined,
+                            iconBackgroundColor:
+                                AppColors.warning.withValues(alpha: 0.10),
+                            iconColor: AppColors.warning,
+                            suffix: 'oeufs',
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Horizontal scroll flock mini cards 160x100, gap 12
-                  SizedBox(
-                    height: 100,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      itemCount: _mockFlocks.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        final f = _mockFlocks[index];
-                        return _FlockMiniCard(
-                          name: f.name,
-                          sub: f.sub,
-                          key_: f.key_,
-                          keyColor: f.keyColor,
-                          dotColor: f.dotColor,
-                          onTap: () => context.push('/flocks/${index + 1}'),
-                        );
-                      },
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: GGStatCard(
+                            label: 'Effectif total',
+                            value: '$totalEffective',
+                            icon: Icons.pets_outlined,
+                            iconBackgroundColor:
+                                AppColors.primary.withValues(alpha: 0.10),
+                            iconColor: AppColors.primary,
+                            suffix: 'sujets',
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 12),
 
-                  // Section header "Raccourcis"
-                  const Text(
-                    'Raccourcis',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.night,
+                    // Amount card full width
+                    GGAmountCard(
+                      label: 'Total revenus (${now.year})',
+                      amountText: _formatAmount(totalRevenue),
+                      icon: Icons.payments_outlined,
+                      trendText: revenueTrend != null
+                          ? '${revenueTrend >= 0 ? '+' : ''}${revenueTrend.toStringAsFixed(0)}%'
+                          : null,
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 24),
 
-                  // Grid 3 columns: Incubation / Vaccins / Stocks
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ShortcutCard(
-                          icon: Icons.device_thermostat_outlined,
-                          label: 'Incubation',
-                          iconColor: AppColors.primary,
-                          onTap: () => context.push(AppRoutes.incubation),
+                    // Section header "Lots actifs" + "Voir tout"
+                    Row(
+                      children: [
+                        const Text(
+                          'Lots actifs',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.night,
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => context.go(AppRoutes.flocks),
+                          child: const Text(
+                            'Voir tout',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Horizontal scroll flock mini cards 160x100, gap 12
+                    if (flocks.isEmpty)
+                      Container(
+                        height: 100,
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Aucun lot actif',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMeta,
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: 100,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.none,
+                          itemCount: flocks.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final f = flocks[index];
+                            return _FlockMiniCard(
+                              name: f.name,
+                              sub: '${f.currentTotal} sujets',
+                              key_: _flockKeyLabel(f),
+                              keyColor: _flockKeyColor(f),
+                              dotColor: _flockDotColor(f),
+                              onTap: () => context.push('/flocks/${f.id}'),
+                            );
+                          },
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ShortcutCard(
-                          icon: Icons.vaccines_outlined,
-                          label: 'Vaccins',
-                          iconColor: AppColors.night,
-                          onTap: () => context.push(AppRoutes.vaccination),
-                        ),
+                    const SizedBox(height: 24),
+
+                    // Section header "Raccourcis"
+                    const Text(
+                      'Raccourcis',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.night,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ShortcutCard(
-                          icon: Icons.inventory_2_outlined,
-                          label: 'Stocks',
-                          iconColor: AppColors.night,
-                          onTap: () => context.push(AppRoutes.stocksRoute),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Grid 3 columns: Incubation / Vaccins / Stocks
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ShortcutCard(
+                            icon: Icons.device_thermostat_outlined,
+                            label: 'Incubation',
+                            iconColor: AppColors.primary,
+                            onTap: () => context.push(AppRoutes.incubation),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ShortcutCard(
+                            icon: Icons.vaccines_outlined,
+                            label: 'Vaccins',
+                            iconColor: AppColors.night,
+                            onTap: () => context.push(AppRoutes.vaccination),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ShortcutCard(
+                            icon: Icons.inventory_2_outlined,
+                            label: 'Stocks',
+                            iconColor: AppColors.night,
+                            onTap: () => context.push(AppRoutes.stocksRoute),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ],
@@ -208,48 +247,34 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
+
+  String _formatAmount(num amount) {
+    final formatter = NumberFormat('#,###', 'fr_FR');
+    return formatter.format(amount);
+  }
+
+  String _flockKeyLabel(FlockSummary f) {
+    if (f.eggsToday != null) return '${f.eggsToday} oeufs/j';
+    if (f.daysRemaining != null) return 'J-${f.daysRemaining}';
+    return '${f.currentTotal} sujets';
+  }
+
+  Color _flockKeyColor(FlockSummary f) {
+    if (f.eggsToday != null) return AppColors.primary;
+    if (f.daysRemaining != null) return AppColors.warning;
+    return AppColors.night;
+  }
+
+  Color _flockDotColor(FlockSummary f) {
+    return switch (f.type) {
+      'LAYER' => AppColors.warning,
+      'BROILER' => AppColors.info,
+      'BREEDER' => AppColors.primary,
+      'QUAIL' => AppColors.gold,
+      _ => AppColors.primary,
+    };
+  }
 }
-
-// Mock flock data for dashboard
-class _MockFlock {
-  final String name;
-  final String sub;
-  final String key_;
-  final Color keyColor;
-  final Color dotColor;
-
-  const _MockFlock({
-    required this.name,
-    required this.sub,
-    required this.key_,
-    required this.keyColor,
-    required this.dotColor,
-  });
-}
-
-const _mockFlocks = [
-  _MockFlock(
-    name: 'Pondeuses A1',
-    sub: '200 sujets',
-    key_: '142 oeufs/j',
-    keyColor: AppColors.primary,
-    dotColor: AppColors.warning,
-  ),
-  _MockFlock(
-    name: 'Chair B2',
-    sub: '180 sujets',
-    key_: 'J-15',
-    keyColor: AppColors.warning,
-    dotColor: AppColors.info,
-  ),
-  _MockFlock(
-    name: 'Repro C1',
-    sub: '90 sujets',
-    key_: '68 oeufs/j',
-    keyColor: AppColors.primary,
-    dotColor: AppColors.primary,
-  ),
-];
 
 /// Flock mini card: 160x100px, radius 16px, glass style
 class _FlockMiniCard extends StatelessWidget {

@@ -24,6 +24,8 @@ export default function ConnexionPage() {
       const role = result.user.role;
       if (role === "SELLER") {
         router.push("/vendeur");
+      } else if (role === "ADMIN") {
+        router.push("/admin");
       } else {
         router.push("/client");
       }

@@ -1,9 +1,10 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  // Pour Android emulateur, utiliser 'http://10.0.2.2:3002/v1'
-  // Pour iOS simulateur ou web, utiliser 'http://localhost:3002/v1'
-  static const String baseUrl = 'http://10.0.2.2:3002/v1';
+  // Production
+  static const String baseUrl = 'https://api.guettgui.com/v1';
+  // Dev Android emulateur : 'http://10.0.2.2:3002/v1'
+  // Dev web/iOS : 'http://localhost:3002/v1'
 
   // --- AUTH ---
   static const String sendOtp = '/auth/send-otp';

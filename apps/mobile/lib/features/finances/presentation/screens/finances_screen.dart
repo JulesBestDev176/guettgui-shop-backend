@@ -5,6 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/router/app_router.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
+import 'package:guettgui_mobile/features/finances/domain/entities/expense.dart';
+import 'package:guettgui_mobile/features/finances/domain/entities/financial_summary.dart';
+import 'package:guettgui_mobile/features/finances/domain/entities/sale.dart';
+import 'package:guettgui_mobile/features/finances/presentation/providers/finance_provider.dart';
+import 'package:intl/intl.dart';
 
 final _finTabProvider = StateProvider<String>((ref) => 'Resume');
 
@@ -16,6 +22,8 @@ class FinancesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activeTab = ref.watch(_finTabProvider);
     final tabs = ['Resume', 'Depenses', 'Ventes', 'Creances'];
+    final teamIdAsync = ref.watch(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.ivory,
@@ -90,9 +98,19 @@ class FinancesScreen extends ConsumerWidget {
 
             // Content
             Expanded(
-              child: activeTab == 'Resume'
-                  ? _ResumeContent()
-                  : _ListContent(tab: activeTab),
+              child: teamId == null
+                  ? Center(
+                      child: Text(
+                        'Aucune equipe configuree',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMeta,
+                        ),
+                      ),
+                    )
+                  : activeTab == 'Resume'
+                      ? _ResumeContent(teamId: teamId)
+                      : _ListContent(tab: activeTab, teamId: teamId),
             ),
           ],
         ),
@@ -101,9 +119,57 @@ class FinancesScreen extends ConsumerWidget {
   }
 }
 
-class _ResumeContent extends StatelessWidget {
+class _ResumeContent extends ConsumerWidget {
+  final String teamId;
+
+  const _ResumeContent({required this.teamId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(financialSummaryProvider(teamId));
+
+    return summaryAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Impossible de charger le resume',
+              style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () =>
+                  ref.invalidate(financialSummaryProvider(teamId)),
+              child: const Text('Reessayer'),
+            ),
+          ],
+        ),
+      ),
+      data: (summary) => _ResumeBody(summary: summary),
+    );
+  }
+}
+
+class _ResumeBody extends StatelessWidget {
+  final FinancialSummary summary;
+
+  const _ResumeBody({required this.summary});
+
+  String _fmt(num value) => NumberFormat('#,###', 'fr_FR').format(value);
+
   @override
   Widget build(BuildContext context) {
+    final margin = summary.totalRevenue > 0
+        ? (summary.netProfit / summary.totalRevenue * 100).toStringAsFixed(1)
+        : '0.0';
+
+    final maxRevenue = summary.revenueByProduct.values.fold<num>(
+        1, (a, b) => a > b ? a : b);
+    final maxExpense = summary.expensesByCategory.values.fold<num>(
+        1, (a, b) => a > b ? a : b);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
       child: Column(
@@ -119,56 +185,65 @@ class _ResumeContent extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _SummaryRow('Revenus', '2 450 000', AppColors.night),
+                _SummaryRow('Revenus', _fmt(summary.totalRevenue), AppColors.night),
                 const SizedBox(height: 10),
-                _SummaryRow('Depenses', '1 380 000', AppColors.night),
+                _SummaryRow('Depenses', _fmt(summary.totalExpenses), AppColors.night),
                 const SizedBox(height: 10),
                 Container(
                   height: 1,
                   color: AppColors.night.withValues(alpha: 0.06),
                 ),
                 const SizedBox(height: 10),
-                _SummaryRow('Resultat net', '1 070 000', AppColors.primary),
+                _SummaryRow('Resultat net', _fmt(summary.netProfit), AppColors.primary),
                 const SizedBox(height: 10),
-                _SummaryRow('Marge', '43,7 %', AppColors.primary),
+                _SummaryRow('Marge', '$margin %', AppColors.primary),
               ],
             ),
           ),
           const SizedBox(height: 24),
 
-          // Revenus par produit
-          const Text(
-            'Revenus par produit',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.night,
+          if (summary.revenueByProduct.isNotEmpty) ...[
+            const Text(
+              'Revenus par produit',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.night,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          _ProgressBar('Oeufs de table', '1 420 000', 0.78, AppColors.primary),
-          const SizedBox(height: 12),
-          _ProgressBar(
-              'Poulets de chair', '760 000', 0.42, AppColors.primary),
-          const SizedBox(height: 12),
-          _ProgressBar('Poussins', '270 000', 0.15, AppColors.primary),
-          const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            ...summary.revenueByProduct.entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ProgressBar(
+                    e.key,
+                    _fmt(e.value),
+                    maxRevenue > 0 ? (e.value / maxRevenue).toDouble() : 0,
+                    AppColors.primary,
+                  ),
+                )),
+            const SizedBox(height: 12),
+          ],
 
-          // Depenses par categorie
-          const Text(
-            'Depenses par categorie',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.night,
+          if (summary.expensesByCategory.isNotEmpty) ...[
+            const Text(
+              'Depenses par categorie',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.night,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          _ProgressBar('Aliment', '840 000', 0.72, AppColors.tealDark),
-          const SizedBox(height: 12),
-          _ProgressBar('Veterinaire', '310 000', 0.34, AppColors.tealDark),
-          const SizedBox(height: 12),
-          _ProgressBar("Main d'oeuvre", '230 000', 0.25, AppColors.tealDark),
+            const SizedBox(height: 12),
+            ...summary.expensesByCategory.entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ProgressBar(
+                    e.key,
+                    _fmt(e.value),
+                    maxExpense > 0 ? (e.value / maxExpense).toDouble() : 0,
+                    AppColors.tealDark,
+                  ),
+                )),
+          ],
         ],
       ),
     );
@@ -245,7 +320,7 @@ class _ProgressBar extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: FractionallySizedBox(
-              widthFactor: pct,
+              widthFactor: pct.clamp(0.0, 1.0),
               child: Container(
                 height: 6,
                 decoration: BoxDecoration(
@@ -261,126 +336,165 @@ class _ProgressBar extends StatelessWidget {
   }
 }
 
-/// Generic finance list content (Depenses / Ventes / Creances)
-class _ListContent extends StatelessWidget {
+/// Finance list content using API data (Depenses / Ventes / Creances)
+class _ListContent extends ConsumerWidget {
   final String tab;
+  final String teamId;
 
-  const _ListContent({required this.tab});
+  const _ListContent({required this.tab, required this.teamId});
 
   @override
-  Widget build(BuildContext context) {
-    final rows = _getRows(tab);
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
-      itemCount: rows.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final r = rows[index];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: r.bg,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(r.icon, size: 16, color: r.color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      r.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.night,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      r.sub,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textMeta,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    r.amount,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: r.color,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  Text(
-                    r.date,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textMeta,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (tab == 'Depenses') {
+      return _ExpensesList(teamId: teamId);
+    } else if (tab == 'Ventes') {
+      return _SalesList(teamId: teamId, showDebts: false);
+    } else {
+      // Creances
+      return _SalesList(teamId: teamId, showDebts: true);
+    }
+  }
+}
+
+class _ExpensesList extends ConsumerWidget {
+  final String teamId;
+
+  const _ExpensesList({required this.teamId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expensesAsync = ref.watch(expenseListProvider(teamId));
+
+    return expensesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => Center(
+        child: Text(
+          'Impossible de charger les depenses',
+          style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+        ),
+      ),
+      data: (expenses) {
+        if (expenses.isEmpty) {
+          return Center(
+            child: Text(
+              'Aucune depense enregistree',
+              style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+          itemCount: expenses.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final e = expenses[index];
+            return _FinanceRow(
+              icon: _categoryIcon(e.category),
+              color: AppColors.error,
+              bg: const Color(0x1AD32F2F),
+              title: e.category,
+              sub: e.description ?? '',
+              amount: '-${_fmt(e.amount)}',
+              date: _formatDate(e.date),
+            );
+          },
         );
       },
     );
   }
 
-  List<_FinRow> _getRows(String tab) {
-    switch (tab) {
-      case 'Depenses':
-        return const [
-          _FinRow(Icons.local_shipping_outlined, AppColors.error,
-              Color(0x1AD32F2F), 'Aliment ponte 2', '10 sacs', '-145 000', '29 aout'),
-          _FinRow(Icons.vaccines_outlined, AppColors.error,
-              Color(0x1AD32F2F), 'Vaccins', 'Newcastle + Gumboro', '-62 000', '26 aout'),
-          _FinRow(Icons.build_outlined, AppColors.error,
-              Color(0x1AD32F2F), 'Reparation abreuvoirs', 'Poulailler 2', '-18 000', '22 aout'),
-        ];
-      case 'Ventes':
-        return const [
-          _FinRow(Icons.egg_outlined, AppColors.primary,
-              Color(0x1A2EA831), 'Oeufs de table', 'Fatou Sow \u00b7 30 plateaux', '+180 000', '28 aout'),
-          _FinRow(Icons.pets_outlined, AppColors.primary,
-              Color(0x1A2EA831), 'Poulets de chair', 'Ibrahima Ba \u00b7 40 sujets', '+240 000', '25 aout'),
-          _FinRow(Icons.egg_outlined, AppColors.primary,
-              Color(0x1A2EA831), 'Oeufs de table', 'Keur Massar \u00b7 15 plateaux', '+90 000', '21 aout'),
-        ];
-      case 'Creances':
-        return const [
-          _FinRow(Icons.schedule_outlined, AppColors.error,
-              Color(0x1AD32F2F), 'Fatou Sow', 'Echeance depassee \u00b7 12 j', '85 000', '18 aout'),
-          _FinRow(Icons.schedule_outlined, AppColors.warning,
-              Color(0x1AF57F17), 'Boutique Keur Massar', 'Echeance 5 sept', '24 000', '25 aout'),
-        ];
-      default:
-        return [];
+  IconData _categoryIcon(String cat) {
+    final lower = cat.toLowerCase();
+    if (lower.contains('aliment') || lower.contains('feed')) {
+      return Icons.local_shipping_outlined;
     }
+    if (lower.contains('vaccin') || lower.contains('vet')) {
+      return Icons.vaccines_outlined;
+    }
+    return Icons.receipt_outlined;
   }
 }
 
-class _FinRow {
+class _SalesList extends ConsumerWidget {
+  final String teamId;
+  final bool showDebts;
+
+  const _SalesList({required this.teamId, required this.showDebts});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final salesAsync = ref.watch(saleListProvider(teamId));
+
+    return salesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => Center(
+        child: Text(
+          'Impossible de charger les ventes',
+          style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+        ),
+      ),
+      data: (sales) {
+        final filtered = showDebts
+            ? sales.where((s) => s.hasDebt).toList()
+            : sales;
+
+        if (filtered.isEmpty) {
+          return Center(
+            child: Text(
+              showDebts
+                  ? 'Aucune creance en cours'
+                  : 'Aucune vente enregistree',
+              style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+          itemCount: filtered.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final s = filtered[index];
+            if (showDebts) {
+              return _FinanceRow(
+                icon: Icons.schedule_outlined,
+                color: AppColors.error,
+                bg: const Color(0x1AD32F2F),
+                title: s.customerName ?? 'Client',
+                sub: '${s.productType} \u00b7 ${s.quantity} unites',
+                amount: _fmt(s.remainingAmount),
+                date: _formatDate(s.date),
+              );
+            }
+            return _FinanceRow(
+              icon: _productIcon(s.productType),
+              color: AppColors.primary,
+              bg: const Color(0x1A2EA831),
+              title: s.productType,
+              sub:
+                  '${s.customerName ?? 'Client'} \u00b7 ${s.quantity} unites',
+              amount: '+${_fmt(s.totalAmount)}',
+              date: _formatDate(s.date),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  IconData _productIcon(String product) {
+    final lower = product.toLowerCase();
+    if (lower.contains('oeuf') || lower.contains('egg')) {
+      return Icons.egg_outlined;
+    }
+    if (lower.contains('poulet') || lower.contains('chair')) {
+      return Icons.pets_outlined;
+    }
+    return Icons.sell_outlined;
+  }
+}
+
+class _FinanceRow extends StatelessWidget {
   final IconData icon;
   final Color color;
   final Color bg;
@@ -389,6 +503,90 @@ class _FinRow {
   final String amount;
   final String date;
 
-  const _FinRow(
-      this.icon, this.color, this.bg, this.title, this.sub, this.amount, this.date);
+  const _FinanceRow({
+    required this.icon,
+    required this.color,
+    required this.bg,
+    required this.title,
+    required this.sub,
+    required this.amount,
+    required this.date,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: bg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.night,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  sub,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMeta,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                amount,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              Text(
+                date,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textMeta,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _fmt(num value) => NumberFormat('#,###', 'fr_FR').format(value);
+
+String _formatDate(DateTime date) {
+  return DateFormat('d MMM', 'fr_FR').format(date);
 }

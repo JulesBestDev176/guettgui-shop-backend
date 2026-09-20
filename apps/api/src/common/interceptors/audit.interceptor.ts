@@ -41,7 +41,7 @@ export class AuditInterceptor implements NestInterceptor {
 
           const entity = this.extractEntity(request.path);
           const entityId =
-            responseData?.data?.id || request.params?.id || '';
+            (responseData as any)?.data?.id || request.params?.id || '';
 
           await this.prisma.auditLog.create({
             data: {
@@ -50,7 +50,7 @@ export class AuditInterceptor implements NestInterceptor {
               action,
               entity,
               entityId: String(entityId),
-              newValue: responseData?.data || null,
+              newValue: (responseData as any)?.data || null,
             },
           });
         } catch (error) {

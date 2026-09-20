@@ -1,25 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
+import 'package:guettgui_mobile/features/customers/presentation/providers/customer_provider.dart';
+import 'package:guettgui_mobile/features/orders/presentation/providers/order_provider.dart';
 import 'package:guettgui_mobile/shared/extensions/context_extensions.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_button.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_text_field.dart';
 
-class CreateOrderScreen extends StatefulWidget {
+class CreateOrderScreen extends ConsumerStatefulWidget {
   const CreateOrderScreen({super.key});
 
   @override
-  State<CreateOrderScreen> createState() => _CreateOrderScreenState();
+  ConsumerState<CreateOrderScreen> createState() =>
+      _CreateOrderScreenState();
 }
 
-class _CreateOrderScreenState extends State<CreateOrderScreen> {
+class _CreateOrderScreenState extends ConsumerState<CreateOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   final _qtyController = TextEditingController();
   String? _client;
   String? _product;
   DateTime _deliveryDate = DateTime.now().add(const Duration(days: 7));
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -43,14 +49,48 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     if (picked != null) setState(() => _deliveryDate = picked);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.showSuccessSnackBar('Commande creee.');
-    context.pop();
+
+    final teamIdAsync = ref.read(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+    if (teamId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier =
+          ref.read(orderNotifierProvider(teamId).notifier);
+      await notifier.createOrder({
+        'customerId': _client,
+        'productType': _product,
+        'quantity': int.parse(_qtyController.text.trim()),
+        'deliveryDate': _deliveryDate.toIso8601String(),
+      });
+
+      if (mounted) {
+        context.showSuccessSnackBar('Commande creee.');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSuccessSnackBar('Erreur: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final teamIdAsync = ref.watch(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+
+    final customersAsync = teamId != null
+        ? ref.watch(customerListProvider(teamId))
+        : null;
+    final customers = customersAsync?.valueOrNull ?? [];
+
     return Scaffold(
       backgroundColor: AppColors.ivory,
       appBar: AppBar(title: const Text(AppStrings.addOrder)),
@@ -70,13 +110,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 ),
                 validator: (v) =>
                     v == null ? 'Selectionnez un client' : null,
-                items: List.generate(
-                  5,
-                  (i) => DropdownMenuItem(
-                    value: 'c_$i',
-                    child: Text('Client ${i + 1}'),
-                  ),
-                ),
+                items: customers
+                    .map((c) => DropdownMenuItem(
+                          value: c.id,
+                          child: Text(c.fullName),
+                        ))
+                    .toList(),
                 onChanged: (v) => setState(() => _client = v),
               ),
               const SizedBox(height: AppDimensions.space16),
@@ -115,7 +154,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.numbers,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Quantite requise';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Quantite requise';
+                  }
                   if (int.tryParse(v.trim()) == null) {
                     return 'Quantite invalide';
                   }
@@ -143,7 +184,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
               GGButton(
                 label: AppStrings.save,
-                onPressed: _isFormValid ? _submit : null,
+                onPressed: _isFormValid && !_isSaving ? _submit : null,
               ),
             ],
           ),

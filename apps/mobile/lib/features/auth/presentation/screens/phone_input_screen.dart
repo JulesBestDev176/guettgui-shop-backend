@@ -96,7 +96,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                     // Prenom
                     _buildField(
                       'Prenom',
-                      'Amadou',
+                      'Votre prenom',
                       _firstNameController,
                     ),
                     const SizedBox(height: 12),
@@ -104,7 +104,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                     // Nom
                     _buildField(
                       'Nom',
-                      'Diallo',
+                      'Votre nom',
                       _lastNameController,
                     ),
                     const SizedBox(height: 12),

@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
 import 'package:guettgui_mobile/core/utils/validators.dart';
+import 'package:guettgui_mobile/features/flocks/presentation/providers/flock_provider.dart';
 import 'package:guettgui_mobile/shared/extensions/context_extensions.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_button.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_text_field.dart';
 
-class CreateFlockScreen extends StatefulWidget {
+class CreateFlockScreen extends ConsumerStatefulWidget {
   const CreateFlockScreen({super.key});
 
   @override
-  State<CreateFlockScreen> createState() => _CreateFlockScreenState();
+  ConsumerState<CreateFlockScreen> createState() => _CreateFlockScreenState();
 }
 
-class _CreateFlockScreenState extends State<CreateFlockScreen> {
+class _CreateFlockScreenState extends ConsumerState<CreateFlockScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _raceController = TextEditingController();
@@ -53,10 +56,39 @@ class _CreateFlockScreenState extends State<CreateFlockScreen> {
     if (picked != null) setState(() => _startDate = picked);
   }
 
-  void _submit() {
+  bool _isSaving = false;
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.showSuccessSnackBar('Lot cree avec succes.');
-    context.pop();
+
+    final teamIdAsync = ref.read(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+    if (teamId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier =
+          ref.read(flockListNotifierProvider(teamId).notifier);
+      await notifier.createFlock({
+        'name': _nameController.text.trim(),
+        'type': _selectedType,
+        'startDate': _startDate.toIso8601String(),
+        'initialFemales': int.tryParse(_femalesController.text.trim()) ?? 0,
+        'initialMales': int.tryParse(_malesController.text.trim()) ?? 0,
+      });
+
+      if (mounted) {
+        context.showSuccessSnackBar('Lot cree avec succes.');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSuccessSnackBar('Erreur: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override

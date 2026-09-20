@@ -1,15 +1,15 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Drumstick, Grid3X3, Home, ShoppingBag, User } from "lucide-react";
+import { Home, LayoutGrid, ShoppingBag, Store, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", icon: Home, label: "Accueil" },
-  { href: "/catalogue", icon: Drumstick, label: "Poulets" },
-  { href: "/commande-rapide", icon: Grid3X3, label: "Rapide" },
-  { href: "/panier", icon: ShoppingBag, label: "Panier" },
-  { href: "/connexion", icon: User, label: "Compte" },
+  { href: "/",          icon: Home,        label: "Accueil" },
+  { href: "/catalogue", icon: LayoutGrid,  label: "Produits" },
+  { href: "/boutiques", icon: Store,       label: "Boutiques" },
+  { href: "/panier",    icon: ShoppingBag, label: "Panier" },
+  { href: "/connexion", icon: User,        label: "Compte" },
 ];
 
 export function MobileNav() {

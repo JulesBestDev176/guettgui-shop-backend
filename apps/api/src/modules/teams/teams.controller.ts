@@ -15,6 +15,8 @@ import { TeamsService } from './teams.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { JoinTeamDto } from './dto/join-team.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
+import { ChangeRoleDto } from './dto/change-role.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TeamMemberGuard } from '../../common/guards/team-member.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -64,6 +66,33 @@ export class TeamsController {
   @ApiOperation({ summary: 'Liste des membres de l\'equipe' })
   getMembers(@Param('teamId') teamId: string) {
     return this.teamsService.getMembers(teamId);
+  }
+
+  @Post(':teamId/members/invite')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, TeamMemberGuard, RolesGuard)
+  @Roles(TeamRole.OWNER)
+  @ApiOperation({ summary: 'Inviter un membre par telephone (OWNER uniquement)' })
+  @ApiResponse({ status: 200, description: 'Invitation envoyee ou code retourne' })
+  inviteMember(
+    @Param('teamId') teamId: string,
+    @Body() dto: InviteMemberDto,
+  ) {
+    return this.teamsService.inviteMember(teamId, dto);
+  }
+
+  @Patch(':teamId/members/:id/role')
+  @UseGuards(JwtAuthGuard, TeamMemberGuard, RolesGuard)
+  @Roles(TeamRole.OWNER)
+  @ApiOperation({ summary: 'Changer le role d\'un membre (OWNER uniquement)' })
+  @ApiResponse({ status: 200, description: 'Role modifie' })
+  changeMemberRole(
+    @Param('teamId') teamId: string,
+    @Param('id') memberId: string,
+    @Body() dto: ChangeRoleDto,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.teamsService.changeMemberRole(teamId, memberId, dto, userId);
   }
 
   @Delete(':teamId/members/:id')

@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
 import 'package:guettgui_mobile/core/utils/formatters.dart';
+import 'package:guettgui_mobile/features/finances/presentation/providers/finance_provider.dart';
 import 'package:guettgui_mobile/shared/extensions/context_extensions.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_button.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_card.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_text_field.dart';
 
-class CreateSaleScreen extends StatefulWidget {
+class CreateSaleScreen extends ConsumerStatefulWidget {
   const CreateSaleScreen({super.key});
 
   @override
-  State<CreateSaleScreen> createState() => _CreateSaleScreenState();
+  ConsumerState<CreateSaleScreen> createState() => _CreateSaleScreenState();
 }
 
-class _CreateSaleScreenState extends State<CreateSaleScreen> {
+class _CreateSaleScreenState extends ConsumerState<CreateSaleScreen> {
   final _formKey = GlobalKey<FormState>();
   final _qtyController = TextEditingController();
   final _priceController = TextEditingController();
@@ -56,10 +59,42 @@ class _CreateSaleScreenState extends State<CreateSaleScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
-  void _submit() {
+  bool _isSaving = false;
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.showSuccessSnackBar('Vente enregistree.');
-    context.pop();
+
+    final teamIdAsync = ref.read(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+    if (teamId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier =
+          ref.read(financeNotifierProvider(teamId).notifier);
+      await notifier.createSale({
+        'productType': _productType,
+        'quantity': int.parse(_qtyController.text.trim()),
+        'unitPrice': int.parse(_priceController.text.trim()),
+        'totalAmount': _total,
+        'date': _date.toIso8601String(),
+        'paymentMode': _paymentMode,
+        if (_clientController.text.trim().isNotEmpty)
+          'customerName': _clientController.text.trim(),
+      });
+
+      if (mounted) {
+        context.showSuccessSnackBar('Vente enregistree.');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSuccessSnackBar('Erreur: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override

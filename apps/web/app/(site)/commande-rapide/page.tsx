@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, Truck, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Truck, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/primitives";
 import { quickOrder } from "@/lib/api";
 import { getCart, clearCart, type CartItem } from "@/lib/cart";
@@ -15,7 +15,7 @@ export default function CommandeRapidePage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [region] = useState("Dakar");
+  const [region, setRegion] = useState("Dakar");
 
   const [items, setItems] = useState<CartItem[]>([]);
 
@@ -126,17 +126,18 @@ export default function CommandeRapidePage() {
             required
           />
         </label>
-        <div className="grid grid-cols-2 gap-2.5">
-          {["Dakar", "Choisir"].map((value, index) => (
-            <label key={index} className="block">
-              <span className="mb-1.5 block text-[11.5px] font-medium text-muted">{index === 0 ? "Region" : "Commune"}</span>
-              <button className="flex h-11 w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 text-[13px] font-medium text-ink">
-                {value}
-                <ChevronDown size={14} />
-              </button>
-            </label>
-          ))}
-        </div>
+        <label className="block">
+          <span className="mb-1.5 block text-[11.5px] font-medium text-muted">Région</span>
+          <select
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-[13px] font-medium text-ink outline-none focus:border-brand appearance-none"
+          >
+            {["Dakar", "Thiès", "Saint-Louis", "Kaolack", "Ziguinchor", "Diourbel", "Fatick", "Kolda", "Tambacounda", "Louga", "Matam", "Kédougou", "Sédhiou"].map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </select>
+        </label>
         <label className="block">
           <span className="mb-1.5 block text-[11.5px] font-medium text-muted">Adresse detaillee</span>
           <Input

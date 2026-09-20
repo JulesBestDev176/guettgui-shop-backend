@@ -38,7 +38,7 @@ services:
 
   api:
     build:
-      context: .
+      context: ./apps/api
       dockerfile: Dockerfile
     container_name: guettgui_api
     restart: unless-stopped
@@ -59,6 +59,27 @@ services:
       NODE_ENV: development
       PORT: 3000
 
+  marketplace-api:
+    build:
+      context: ./apps/marketplace-api
+      dockerfile: Dockerfile
+    container_name: guettgui_marketplace_api
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://guettgui:guettgui@postgres:5432/guettgui_marketplace?schema=public
+      JWT_SECRET: changeme-in-production-very-long-secret
+      PORT: 4000
+      NODE_ENV: development
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+    volumes:
+      - marketplace_uploads:/app/uploads
+
 volumes:
   postgres_data:
   minio_data:
+  marketplace_uploads:

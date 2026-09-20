@@ -30,6 +30,10 @@ body {
   font-family: var(--font-body);
 }
 
+.border-3 {
+  border-width: 3px;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;

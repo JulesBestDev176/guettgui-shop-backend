@@ -1,156 +1,179 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
 import 'package:guettgui_mobile/core/utils/formatters.dart';
+import 'package:guettgui_mobile/features/customers/presentation/providers/customer_provider.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_card.dart';
 
-class CustomerDetailScreen extends StatelessWidget {
+class CustomerDetailScreen extends ConsumerWidget {
   final String customerId;
 
   const CustomerDetailScreen({super.key, required this.customerId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final teamIdAsync = ref.watch(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+
+    if (teamId == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Detail client')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final customerAsync = ref.watch(
+      customerDetailProvider((teamId: teamId, customerId: customerId)),
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Detail client')),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: () async {
-          await Future.delayed(const Duration(milliseconds: 500));
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: AppDimensions.screenPadding,
+      body: customerAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // --- Infos client ---
-              GGCard(
-                child: Column(
-                  children: [
-                    const CircleAvatar(
-                      radius: 36,
-                      backgroundColor: AppColors.primaryLight,
-                      child: Icon(
-                        Icons.person,
-                        size: 40,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimensions.space12),
-                    const Text(
-                      'Amadou Diop',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Text(
-                      'Particulier - Thies',
-                      style: TextStyle(color: AppColors.grey600),
-                    ),
-                    const SizedBox(height: AppDimensions.space12),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.phone,
-                          size: 16,
-                          color: AppColors.grey500,
+              Text(
+                'Impossible de charger le client',
+                style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => ref.invalidate(
+                  customerDetailProvider(
+                    (teamId: teamId, customerId: customerId),
+                  ),
+                ),
+                child: const Text('Reessayer'),
+              ),
+            ],
+          ),
+        ),
+        data: (customer) => RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            ref.invalidate(
+              customerDetailProvider(
+                (teamId: teamId, customerId: customerId),
+              ),
+            );
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: AppDimensions.screenPadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // --- Infos client ---
+                GGCard(
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 36,
+                        backgroundColor: AppColors.primaryLight,
+                        child: Text(
+                          customer.firstName.isNotEmpty
+                              ? customer.firstName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
                         ),
-                        SizedBox(width: 4),
+                      ),
+                      const SizedBox(height: AppDimensions.space12),
+                      Text(
+                        customer.fullName,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (customer.address != null)
                         Text(
-                          '+221 77 123 45 67',
-                          style: TextStyle(color: AppColors.grey600),
+                          customer.address!,
+                          style:
+                              const TextStyle(color: AppColors.grey600),
+                        ),
+                      const SizedBox(height: AppDimensions.space12),
+                      if (customer.phone != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.phone,
+                              size: 16,
+                              color: AppColors.grey500,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              customer.phone!,
+                              style: const TextStyle(
+                                  color: AppColors.grey600),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.space16),
+
+                // --- Solde creances ---
+                if (customer.hasDebt)
+                  GGCard(
+                    backgroundColor: AppColors.warningLight,
+                    child: Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          AppStrings.outstandingDebt,
+                          style:
+                              TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          Formatters.xof(customer.totalDebt),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.warning,
+                          ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppDimensions.space16),
-
-              // --- Solde creances ---
-              GGCard(
-                backgroundColor: AppColors.warningLight,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      AppStrings.outstandingDebt,
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      Formatters.xof(35000),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.warning,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppDimensions.space20),
-
-              // --- Historique achats ---
-              const Text(
-                AppStrings.purchaseHistory,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppDimensions.space12),
-              ...List.generate(
-                5,
-                (i) => Padding(
-                  padding: const EdgeInsets.only(
-                    bottom: AppDimensions.space8,
                   ),
-                  child: GGCard(
+                if (customer.hasDebt)
+                  const SizedBox(height: AppDimensions.space20),
+
+                // --- Total achats ---
+                if (customer.totalPurchases > 0) ...[
+                  const Text(
+                    AppStrings.purchaseHistory,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.space12),
+                  GGCard(
                     child: Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppColors.successLight,
-                            borderRadius: BorderRadius.circular(
-                              AppDimensions.radiusSm,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.shopping_cart,
-                            color: AppColors.success,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: AppDimensions.space12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Poussins x ${(i + 1) * 10}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Il y a ${(i + 1) * 7} jours',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.grey500,
-                                ),
-                              ),
-                            ],
-                          ),
+                        const Text(
+                          'Total achats',
+                          style:
+                              TextStyle(fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          Formatters.xofShort((i + 1) * 25000),
+                          Formatters.xof(customer.totalPurchases),
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,
@@ -159,9 +182,29 @@ class CustomerDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+
+                if (customer.notes != null &&
+                    customer.notes!.isNotEmpty) ...[
+                  const SizedBox(height: AppDimensions.space20),
+                  const Text(
+                    'Notes',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.space8),
+                  GGCard(
+                    child: Text(
+                      customer.notes!,
+                      style: const TextStyle(
+                          color: AppColors.grey600),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

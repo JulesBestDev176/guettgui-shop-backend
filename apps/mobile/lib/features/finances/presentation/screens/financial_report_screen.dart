@@ -1,189 +1,124 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
 import 'package:guettgui_mobile/core/utils/csv_exporter.dart';
 import 'package:guettgui_mobile/core/utils/formatters.dart';
 import 'package:guettgui_mobile/core/utils/pdf_generator.dart';
-import 'package:guettgui_mobile/features/finances/domain/entities/expense.dart';
-import 'package:guettgui_mobile/features/finances/domain/entities/sale.dart';
+import 'package:guettgui_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:guettgui_mobile/features/finances/domain/entities/financial_summary.dart';
+import 'package:guettgui_mobile/features/finances/presentation/providers/finance_provider.dart';
 import 'package:guettgui_mobile/shared/extensions/context_extensions.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_card.dart';
 
-class FinancialReportScreen extends StatelessWidget {
+class FinancialReportScreen extends ConsumerWidget {
   const FinancialReportScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final teamIdAsync = ref.watch(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(AppStrings.financialReport),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              switch (value) {
-                case 'pdf':
-                  _exportPdf(context);
-                case 'csv_sales':
-                  _exportCsvSales(context);
-                case 'csv_expenses':
-                  _exportCsvExpenses(context);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'pdf',
-                child: Row(
-                  children: [
-                    Icon(Icons.picture_as_pdf, color: AppColors.error, size: 20),
-                    SizedBox(width: 12),
-                    Text('Exporter PDF'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'csv_sales',
-                child: Row(
-                  children: [
-                    Icon(Icons.table_chart, color: AppColors.primary, size: 20),
-                    SizedBox(width: 12),
-                    Text('Exporter ventes CSV'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'csv_expenses',
-                child: Row(
-                  children: [
-                    Icon(Icons.table_chart, color: AppColors.warning, size: 20),
-                    SizedBox(width: 12),
-                    Text('Exporter depenses CSV'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: AppDimensions.screenPadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GGCard(
-              child: Column(
-                children: [
-                  _ReportRow(
-                    'Total revenus',
-                    Formatters.xof(2450000),
-                    AppColors.success,
-                  ),
-                  _ReportRow(
-                    'Total depenses',
-                    Formatters.xof(1600000),
-                    AppColors.error,
-                  ),
-                  const Divider(),
-                  _ReportRow(
-                    'Resultat net',
-                    Formatters.xof(850000),
-                    AppColors.primary,
-                  ),
-                  _ReportRow('Marge', '34.7%', AppColors.primary),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppDimensions.space16),
-
-            // Export buttons row
-            Row(
-              children: [
-                Expanded(
-                  child: _ExportButton(
-                    icon: Icons.picture_as_pdf,
-                    label: 'Exporter PDF',
-                    color: AppColors.error,
-                    onTap: () => _exportPdf(context),
+          if (teamId != null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                switch (value) {
+                  case 'pdf':
+                    _exportPdf(context, ref, teamId);
+                  case 'csv_sales':
+                    _exportCsvSales(context, ref, teamId);
+                  case 'csv_expenses':
+                    _exportCsvExpenses(context, ref, teamId);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'pdf',
+                  child: Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf,
+                          color: AppColors.error, size: 20),
+                      SizedBox(width: 12),
+                      Text('Exporter PDF'),
+                    ],
                   ),
                 ),
-                const SizedBox(width: AppDimensions.space12),
-                Expanded(
-                  child: _ExportButton(
-                    icon: Icons.table_chart,
-                    label: 'Exporter CSV',
-                    color: AppColors.primary,
-                    onTap: () => _exportCsvSales(context),
+                const PopupMenuItem(
+                  value: 'csv_sales',
+                  child: Row(
+                    children: [
+                      Icon(Icons.table_chart,
+                          color: AppColors.primary, size: 20),
+                      SizedBox(width: 12),
+                      Text('Exporter ventes CSV'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'csv_expenses',
+                  child: Row(
+                    children: [
+                      Icon(Icons.table_chart,
+                          color: AppColors.warning, size: 20),
+                      SizedBox(width: 12),
+                      Text('Exporter depenses CSV'),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppDimensions.space20),
-
-            const Text(
-              'Revenus par produit',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: AppDimensions.space12),
-            _BarItem('Poussins', 1200000, 2450000),
-            _BarItem('Oeufs', 750000, 2450000),
-            _BarItem('Poulets', 500000, 2450000),
-            const SizedBox(height: AppDimensions.space20),
-
-            const Text(
-              'Depenses par categorie',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: AppDimensions.space12),
-            _BarItem('Alimentation', 800000, 1600000, isExpense: true),
-            _BarItem('Main d\'oeuvre', 300000, 1600000, isExpense: true),
-            _BarItem('Sante', 200000, 1600000, isExpense: true),
-            _BarItem('Equipement', 150000, 1600000, isExpense: true),
-            _BarItem('Autre', 150000, 1600000, isExpense: true),
-          ],
-        ),
+        ],
       ),
+      body: teamId == null
+          ? Center(
+              child: Text(
+                'Aucune equipe configuree',
+                style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+              ),
+            )
+          : _ReportBody(teamId: teamId),
     );
   }
 
-  Future<void> _exportPdf(BuildContext context) async {
+  Future<void> _exportPdf(
+      BuildContext context, WidgetRef ref, String teamId) async {
+    final summaryAsync = ref.read(financialSummaryProvider(teamId));
+    final summary = summaryAsync.valueOrNull;
+    if (summary == null) return;
+
+    final user = ref.read(authStateProvider).user;
+    final margin = summary.totalRevenue > 0
+        ? (summary.netProfit / summary.totalRevenue * 100)
+        : 0.0;
+
     final pdfBytes = await PdfGenerator.generateMonthlyReport(
-      farmName: 'Elevage Diop',
+      farmName: user?.teamName ?? 'Ferme',
       month: DateTime(DateTime.now().year, DateTime.now().month),
       financials: {
-        'totalRevenue': 2450000,
-        'totalExpenses': 1600000,
-        'netResult': 850000,
-        'margin': 34.7,
-        'revenueByProduct': <Map<String, dynamic>>[
-          {'product': 'Poussins', 'amount': 1200000},
-          {'product': 'Oeufs', 'amount': 750000},
-          {'product': 'Poulets', 'amount': 500000},
-        ],
-        'expensesByCategory': <Map<String, dynamic>>[
-          {'category': 'Alimentation', 'amount': 800000},
-          {'category': 'Sante', 'amount': 200000},
-          {'category': 'Main d\'oeuvre', 'amount': 300000},
-          {'category': 'Equipement', 'amount': 150000},
-          {'category': 'Autre', 'amount': 150000},
-        ],
+        'totalRevenue': summary.totalRevenue,
+        'totalExpenses': summary.totalExpenses,
+        'netResult': summary.netProfit,
+        'margin': margin,
+        'revenueByProduct': summary.revenueByProduct.entries
+            .map((e) => {'product': e.key, 'amount': e.value})
+            .toList(),
+        'expensesByCategory': summary.expensesByCategory.entries
+            .map((e) => {'category': e.key, 'amount': e.value})
+            .toList(),
       },
-      production: {
-        'totalEggs': 2760,
-        'avgLayingRate': 66,
-        'totalMortality': 12,
-        'chicksHatched': 180,
-      },
-      stocks: {
-        'items': <Map<String, dynamic>>[
-          {'name': 'Aliment ponte', 'quantity': 120, 'unit': 'kg'},
-          {'name': 'Aliment croissance', 'quantity': 85, 'unit': 'kg'},
-        ],
-      },
+      production: const {},
+      stocks: const {},
     );
 
     if (context.mounted) {
@@ -197,80 +132,162 @@ class FinancialReportScreen extends StatelessWidget {
     }
   }
 
-  void _exportCsvSales(BuildContext context) {
-    final sales = [
-      Sale(
-        id: '1',
-        productType: 'CHICKS',
-        quantity: 50,
-        unitPrice: 500,
-        totalAmount: 25000,
-        paidAmount: 25000,
-        paymentStatus: 'PAID',
-        customerName: 'Diop',
-        date: DateTime.now(),
-        teamId: 't1',
-        recordedById: 'u1',
-        createdAt: DateTime.now(),
-      ),
-      Sale(
-        id: '2',
-        productType: 'TABLE_EGGS',
-        quantity: 5,
-        unitPrice: 3000,
-        totalAmount: 15000,
-        paidAmount: 10000,
-        paymentStatus: 'PARTIAL',
-        customerName: 'Fall',
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        teamId: 't1',
-        recordedById: 'u1',
-        createdAt: DateTime.now(),
-      ),
-    ];
+  Future<void> _exportCsvSales(
+      BuildContext context, WidgetRef ref, String teamId) async {
+    final salesAsync = ref.read(saleListProvider(teamId));
+    final sales = salesAsync.valueOrNull ?? [];
+
+    if (sales.isEmpty) {
+      context.showSuccessSnackBar('Aucune vente a exporter.');
+      return;
+    }
 
     final csv = CsvExporter.exportSales(sales);
-    Printing.sharePdf(
+    await Printing.sharePdf(
       bytes: _stringToBytes(csv),
       filename: 'ventes_guettgui.csv',
     );
-    context.showSuccessSnackBar('Export CSV des ventes genere.');
+    if (context.mounted) {
+      context.showSuccessSnackBar('Export CSV des ventes genere.');
+    }
   }
 
-  void _exportCsvExpenses(BuildContext context) {
-    final expenses = [
-      Expense(
-        id: '1',
-        category: 'ALIMENTATION',
-        amount: 50000,
-        description: 'Aliment ponte 50kg',
-        date: DateTime.now(),
-        teamId: 't1',
-        recordedById: 'u1',
-        createdAt: DateTime.now(),
-      ),
-      Expense(
-        id: '2',
-        category: 'SANTE',
-        amount: 15000,
-        description: 'Vaccin Newcastle',
-        date: DateTime.now().subtract(const Duration(days: 2)),
-        teamId: 't1',
-        recordedById: 'u1',
-        createdAt: DateTime.now(),
-      ),
-    ];
+  Future<void> _exportCsvExpenses(
+      BuildContext context, WidgetRef ref, String teamId) async {
+    final expensesAsync = ref.read(expenseListProvider(teamId));
+    final expenses = expensesAsync.valueOrNull ?? [];
+
+    if (expenses.isEmpty) {
+      context.showSuccessSnackBar('Aucune depense a exporter.');
+      return;
+    }
 
     final csv = CsvExporter.exportExpenses(expenses);
-    Printing.sharePdf(
+    await Printing.sharePdf(
       bytes: _stringToBytes(csv),
       filename: 'depenses_guettgui.csv',
     );
-    context.showSuccessSnackBar('Export CSV des depenses genere.');
+    if (context.mounted) {
+      context.showSuccessSnackBar('Export CSV des depenses genere.');
+    }
   }
 
   static Uint8List _stringToBytes(String s) =>
       Uint8List.fromList(s.codeUnits);
+}
+
+class _ReportBody extends ConsumerWidget {
+  final String teamId;
+
+  const _ReportBody({required this.teamId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(financialSummaryProvider(teamId));
+
+    return summaryAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Impossible de charger le rapport',
+              style: TextStyle(fontSize: 13, color: AppColors.textMeta),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () =>
+                  ref.invalidate(financialSummaryProvider(teamId)),
+              child: const Text('Reessayer'),
+            ),
+          ],
+        ),
+      ),
+      data: (summary) => _ReportContent(summary: summary),
+    );
+  }
+}
+
+class _ReportContent extends StatelessWidget {
+  final FinancialSummary summary;
+
+  const _ReportContent({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final margin = summary.totalRevenue > 0
+        ? (summary.netProfit / summary.totalRevenue * 100)
+            .toStringAsFixed(1)
+        : '0.0';
+
+    return SingleChildScrollView(
+      padding: AppDimensions.screenPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GGCard(
+            child: Column(
+              children: [
+                _ReportRow(
+                  'Total revenus',
+                  Formatters.xof(summary.totalRevenue),
+                  AppColors.success,
+                ),
+                _ReportRow(
+                  'Total depenses',
+                  Formatters.xof(summary.totalExpenses),
+                  AppColors.error,
+                ),
+                const Divider(),
+                _ReportRow(
+                  'Resultat net',
+                  Formatters.xof(summary.netProfit),
+                  AppColors.primary,
+                ),
+                _ReportRow('Marge', '$margin%', AppColors.primary),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppDimensions.space20),
+
+          if (summary.revenueByProduct.isNotEmpty) ...[
+            const Text(
+              'Revenus par produit',
+              style:
+                  TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppDimensions.space12),
+            ...summary.revenueByProduct.entries.map(
+              (e) => _BarItem(
+                e.key,
+                e.value.toInt(),
+                summary.totalRevenue.toInt(),
+              ),
+            ),
+            const SizedBox(height: AppDimensions.space20),
+          ],
+
+          if (summary.expensesByCategory.isNotEmpty) ...[
+            const Text(
+              'Depenses par categorie',
+              style:
+                  TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppDimensions.space12),
+            ...summary.expensesByCategory.entries.map(
+              (e) => _BarItem(
+                e.key,
+                e.value.toInt(),
+                summary.totalExpenses.toInt(),
+                isExpense: true,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _ReportRow extends StatelessWidget {
@@ -287,46 +304,12 @@ class _ReportRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.grey600)),
+          Text(label,
+              style: const TextStyle(color: AppColors.grey600)),
           Text(
             value,
-            style: TextStyle(fontWeight: FontWeight.w700, color: color),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExportButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ExportButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GGCard(
-      onTap: onTap,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: AppDimensions.space8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
+            style:
+                TextStyle(fontWeight: FontWeight.w700, color: color),
           ),
         ],
       ),
@@ -370,18 +353,21 @@ class _BarItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isExpense ? AppColors.error : AppColors.success,
+                  color:
+                      isExpense ? AppColors.error : AppColors.success,
                 ),
               ),
             ],
           ),
           const SizedBox(height: AppDimensions.space4),
           ClipRRect(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusFull),
             child: LinearProgressIndicator(
-              value: percent,
+              value: percent.clamp(0.0, 1.0),
               backgroundColor: AppColors.grey200,
-              color: isExpense ? AppColors.error : AppColors.success,
+              color:
+                  isExpense ? AppColors.error : AppColors.success,
               minHeight: 6,
             ),
           ),

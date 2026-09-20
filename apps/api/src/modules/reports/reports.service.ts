@@ -72,7 +72,7 @@ export class ReportsService {
 
     // Taux de ponte
     const layerRecords = records.filter((r) =>
-      [FlockType.BREEDER, FlockType.LAYER, FlockType.QUAIL].includes(r.flock.type),
+      [FlockType.BREEDER, FlockType.LAYER, FlockType.QUAIL].includes(r.flock.type as any),
     );
     const totalFemales = new Set(layerRecords.map((r) => r.flockId)).size > 0
       ? layerRecords.reduce((sum, r) => sum + (r.flock.currentFemales || r.flock.currentTotal || 0), 0)

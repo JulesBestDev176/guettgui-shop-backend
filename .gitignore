@@ -1,23 +1,28 @@
-# Backend
-backend/node_modules/
-backend/dist/
-backend/.env
-backend/prisma/migrations/
+# API (NestJS)
+apps/api/node_modules/
+apps/api/dist/
+apps/api/.env
+apps/api/prisma/migrations/
 
-# Mobile
-mobile/.dart_tool/
-mobile/.packages
-mobile/build/
-mobile/android/.gradle/
-mobile/ios/Pods/
-mobile/ios/.symlinks/
-mobile/.flutter-plugins
-mobile/.flutter-plugins-dependencies
+# Mobile (Flutter)
+apps/mobile/.dart_tool/
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/android/.gradle/
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
 
-# Backoffice
-backoffice/node_modules/
-backoffice/.next/
-backoffice/.env
+# Web (React PWA)
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.env
+
+# Backoffice (Next.js)
+apps/backoffice/node_modules/
+apps/backoffice/.next/
+apps/backoffice/.env
 
 # General
 .env
@@ -31,5 +36,4 @@ Thumbs.db
 # Generated
 *.g.dart
 *.freezed.dart
-backend/.env
 .mcp.json

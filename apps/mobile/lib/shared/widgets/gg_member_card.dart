@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:guettgui_mobile/core/constants/app_colors.dart';
 
 /// Member card COMPACTE (row, pas aspect ratio 1.6).
 /// height auto (~80px), radius 16px, padding 14px

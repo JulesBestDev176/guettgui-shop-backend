@@ -1,26 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
+import 'package:guettgui_mobile/features/customers/presentation/providers/customer_provider.dart';
 import 'package:guettgui_mobile/shared/extensions/context_extensions.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_button.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_text_field.dart';
 
-class CreateCustomerScreen extends StatefulWidget {
+class CreateCustomerScreen extends ConsumerStatefulWidget {
   const CreateCustomerScreen({super.key});
 
   @override
-  State<CreateCustomerScreen> createState() => _CreateCustomerScreenState();
+  ConsumerState<CreateCustomerScreen> createState() =>
+      _CreateCustomerScreenState();
 }
 
-class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
+class _CreateCustomerScreenState
+    extends ConsumerState<CreateCustomerScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _cityController = TextEditingController();
   String? _type;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -38,10 +44,37 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
         _type != null;
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.showSuccessSnackBar('Client ajoute.');
-    context.pop();
+
+    final teamIdAsync = ref.read(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+    if (teamId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier =
+          ref.read(customerNotifierProvider(teamId).notifier);
+      await notifier.createCustomer({
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        if (_cityController.text.trim().isNotEmpty)
+          'address': _cityController.text.trim(),
+      });
+
+      if (mounted) {
+        context.showSuccessSnackBar('Client ajoute.');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSuccessSnackBar('Erreur: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -58,11 +91,13 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
             children: [
               GGTextField(
                 label: AppStrings.firstName,
-                hint: 'Ex: Amadou',
+                hint: 'Votre prenom',
                 controller: _firstNameController,
                 prefixIcon: Icons.person,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Prenom requis';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Prenom requis';
+                  }
                   return null;
                 },
                 onChanged: (_) => setState(() {}),
@@ -71,7 +106,7 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
 
               GGTextField(
                 label: AppStrings.lastName,
-                hint: 'Ex: Diop',
+                hint: 'Votre nom',
                 controller: _lastNameController,
                 prefixIcon: Icons.person_outline,
                 validator: (v) {
@@ -89,7 +124,9 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
                 keyboardType: TextInputType.phone,
                 prefixIcon: Icons.phone,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Telephone requis';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Telephone requis';
+                  }
                   return null;
                 },
                 onChanged: (_) => setState(() {}),
@@ -110,7 +147,8 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
                   labelText: AppStrings.customerType,
                   prefixIcon: Icon(Icons.category),
                 ),
-                validator: (v) => v == null ? 'Selectionnez un type' : null,
+                validator: (v) =>
+                    v == null ? 'Selectionnez un type' : null,
                 items: const [
                   DropdownMenuItem(
                     value: 'PARTICULIER',
@@ -131,7 +169,8 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
 
               GGButton(
                 label: AppStrings.save,
-                onPressed: _isFormValid ? _submit : null,
+                onPressed:
+                    _isFormValid && !_isSaving ? _submit : null,
               ),
             ],
           ),

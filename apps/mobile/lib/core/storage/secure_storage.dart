@@ -5,6 +5,12 @@ final secureStorageProvider = Provider<SecureStorageService>((ref) {
   return SecureStorageService();
 });
 
+/// Provider pour obtenir le teamId courant depuis SecureStorage.
+final currentTeamIdProvider = FutureProvider<String?>((ref) async {
+  final storage = ref.watch(secureStorageProvider);
+  return storage.getTeamId();
+});
+
 class SecureStorageService {
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';

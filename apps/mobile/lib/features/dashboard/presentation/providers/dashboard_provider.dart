@@ -1,73 +1,59 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
 import 'package:guettgui_mobile/features/dashboard/domain/entities/dashboard_stats.dart';
+import 'package:guettgui_mobile/features/dashboard/presentation/providers/dashboard_data_provider.dart';
+// --- Dashboard Stats Provider (from API) ---
+final dashboardStatsProvider =
+    FutureProvider.autoDispose<DashboardStats>((ref) async {
+  final teamIdAsync = ref.watch(currentTeamIdProvider);
+  final teamId = teamIdAsync.valueOrNull;
+  if (teamId == null) return const DashboardStats();
 
-final dashboardStatsProvider = StateProvider<DashboardStats>((ref) {
-  // Mock data for now; will connect to repository later
-  return const DashboardStats(
-    eggsToday: 142,
-    eggsDiff: 5,
-    totalEffective: 520,
-    monthRevenue: 850000,
-    activeAlerts: 3,
-    totalRevenue: 2450000,
-    revenueTrend: 12.5,
-  );
+  try {
+    final repo = ref.watch(dashboardRepositoryProvider);
+    return await repo.getDashboardStats(teamId);
+  } catch (e) {
+    debugPrint('[DashboardProvider] Erreur stats: $e');
+    return const DashboardStats();
+  }
 });
 
+// --- Active Flocks Summary Provider (from API) ---
 final activeFlocksSummaryProvider =
-    StateProvider<List<FlockSummary>>((ref) {
-  return [
-    const FlockSummary(
-      id: '1',
-      name: 'Goliath - Noyau 1',
-      type: 'BREEDER',
-      currentTotal: 200,
-      eggsToday: 142,
-      status: 'ACTIVE',
-    ),
-    const FlockSummary(
-      id: '2',
-      name: 'Chair - Lot 12',
-      type: 'BROILER',
-      currentTotal: 300,
-      daysRemaining: 15,
-      status: 'ACTIVE',
-    ),
-    const FlockSummary(
-      id: '3',
-      name: 'Pondeuses - Lot 3',
-      type: 'LAYER',
-      currentTotal: 150,
-      eggsToday: 98,
-      status: 'ACTIVE',
-    ),
-  ];
+    FutureProvider.autoDispose<List<FlockSummary>>((ref) async {
+  final teamIdAsync = ref.watch(currentTeamIdProvider);
+  final teamId = teamIdAsync.valueOrNull;
+  if (teamId == null) return [];
+
+  try {
+    final datasource = ref.watch(dashboardRemoteDataSourceProvider);
+    final rawFlocks = await datasource.getActiveFlocks(teamId);
+    return rawFlocks.map((json) => FlockSummary.fromJson(json)).toList();
+  } catch (e) {
+    debugPrint('[DashboardProvider] Erreur flocks actifs: $e');
+    return [];
+  }
 });
 
-final activeAlertsProvider = StateProvider<List<AlertSummary>>((ref) {
-  return [
-    const AlertSummary(
-      id: '1',
-      type: 'LOW_STOCK',
-      title: 'Stock aliment bas',
-      message: 'Aliment pondeuse : 40 kg restants',
-      priority: 'HIGH',
-    ),
-    const AlertSummary(
-      id: '2',
-      type: 'CANDLING_DUE',
-      title: 'Mirage a faire demain',
-      message: 'Lot Incubation #5 - J7',
-      priority: 'HIGH',
-    ),
-    const AlertSummary(
-      id: '3',
-      type: 'MISSING_RECORD',
-      title: 'Saisie manquante',
-      message: 'Lot Chair #12 - Hier',
-      priority: 'LOW',
-    ),
-  ];
+// --- Active Alerts Provider (from API) ---
+final activeAlertsProvider =
+    FutureProvider.autoDispose<List<AlertSummary>>((ref) async {
+  final teamIdAsync = ref.watch(currentTeamIdProvider);
+  final teamId = teamIdAsync.valueOrNull;
+  if (teamId == null) return [];
+
+  try {
+    final datasource = ref.watch(dashboardRemoteDataSourceProvider);
+    final rawAlerts = await datasource.getActiveAlerts(teamId);
+    return rawAlerts
+        .where((json) => json['isDismissed'] != true)
+        .map((json) => AlertSummary.fromJson(json))
+        .toList();
+  } catch (e) {
+    debugPrint('[DashboardProvider] Erreur alertes: $e');
+    return [];
+  }
 });
 
 class FlockSummary {
@@ -88,6 +74,18 @@ class FlockSummary {
     this.daysRemaining,
     required this.status,
   });
+
+  factory FlockSummary.fromJson(Map<String, dynamic> json) {
+    return FlockSummary(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      currentTotal: json['currentTotal'] as int? ?? 0,
+      eggsToday: json['eggsToday'] as int?,
+      daysRemaining: json['daysRemaining'] as int?,
+      status: json['status'] as String? ?? 'ACTIVE',
+    );
+  }
 }
 
 class AlertSummary {
@@ -104,4 +102,14 @@ class AlertSummary {
     required this.message,
     required this.priority,
   });
+
+  factory AlertSummary.fromJson(Map<String, dynamic> json) {
+    return AlertSummary(
+      id: json['id'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      message: json['message'] as String? ?? '',
+      priority: json['priority'] as String? ?? 'LOW',
+    );
+  }
 }

@@ -149,7 +149,7 @@ export class IncubationService {
   async hatch(teamId: string, batchId: string, dto: HatchResultDto) {
     const batch = await this.findBatch(teamId, batchId);
 
-    if (![IncubationStatus.CANDLING_1, IncubationStatus.CANDLING_2, IncubationStatus.INCUBATING].includes(batch.status)) {
+    if (![IncubationStatus.CANDLING_1, IncubationStatus.CANDLING_2, IncubationStatus.INCUBATING].includes(batch.status as any)) {
       throw new BadRequestException('Ce lot de couveuse ne peut pas recevoir de resultat d\'eclosion');
     }
 

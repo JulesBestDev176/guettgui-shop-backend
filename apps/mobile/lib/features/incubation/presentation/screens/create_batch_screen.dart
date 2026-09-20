@@ -1,28 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:guettgui_mobile/core/constants/app_colors.dart';
 import 'package:guettgui_mobile/core/constants/app_dimensions.dart';
 import 'package:guettgui_mobile/core/constants/app_strings.dart';
+import 'package:guettgui_mobile/core/storage/secure_storage.dart';
+import 'package:guettgui_mobile/features/incubation/presentation/providers/incubation_provider.dart';
 import 'package:guettgui_mobile/shared/extensions/context_extensions.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_button.dart';
 import 'package:guettgui_mobile/shared/widgets/gg_text_field.dart';
 
-class CreateBatchScreen extends StatefulWidget {
+class CreateBatchScreen extends ConsumerStatefulWidget {
   const CreateBatchScreen({super.key});
 
   @override
-  State<CreateBatchScreen> createState() => _CreateBatchScreenState();
+  ConsumerState<CreateBatchScreen> createState() =>
+      _CreateBatchScreenState();
 }
 
-class _CreateBatchScreenState extends State<CreateBatchScreen> {
+class _CreateBatchScreenState extends ConsumerState<CreateBatchScreen> {
   final _formKey = GlobalKey<FormState>();
   final _eggsController = TextEditingController();
   DateTime _loadDate = DateTime.now();
+  bool _isSaving = false;
 
   @override
   void dispose() {
     _eggsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final teamIdAsync = ref.read(currentTeamIdProvider);
+    final teamId = teamIdAsync.valueOrNull;
+    if (teamId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier =
+          ref.read(incubationNotifierProvider(teamId).notifier);
+      await notifier.createBatch({
+        'eggsLoaded': int.tryParse(_eggsController.text.trim()) ?? 0,
+        'loadDate': _loadDate.toIso8601String(),
+      });
+
+      if (mounted) {
+        context.showSuccessSnackBar('Lot couveuse cree.');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSuccessSnackBar('Erreur: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -48,24 +81,27 @@ class _CreateBatchScreenState extends State<CreateBatchScreen> {
               GGTextField(
                 label: AppStrings.loadDate,
                 controller: TextEditingController(
-                  text: '${_loadDate.day}/${_loadDate.month}/${_loadDate.year}',
+                  text:
+                      '${_loadDate.day}/${_loadDate.month}/${_loadDate.year}',
                 ),
                 prefixIcon: Icons.calendar_today,
                 enabled: false,
               ),
               const SizedBox(height: AppDimensions.space24),
-              const Text('Dates calculees:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const Text('Dates calculees:',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: AppDimensions.space12),
-              _DateInfo('Mirage J7', DateTime.now().add(const Duration(days: 7))),
-              _DateInfo('Mirage J14', DateTime.now().add(const Duration(days: 14))),
-              _DateInfo('Eclosion J24', DateTime.now().add(const Duration(days: 24))),
+              _DateInfo('Mirage J7',
+                  _loadDate.add(const Duration(days: 7))),
+              _DateInfo('Mirage J14',
+                  _loadDate.add(const Duration(days: 14))),
+              _DateInfo('Eclosion J24',
+                  _loadDate.add(const Duration(days: 24))),
               const SizedBox(height: AppDimensions.space32),
               GGButton(
                 label: AppStrings.save,
-                onPressed: () {
-                  context.showSuccessSnackBar('Lot couveuse cree.');
-                  context.pop();
-                },
+                onPressed: _isSaving ? null : _submit,
               ),
             ],
           ),
@@ -89,9 +125,12 @@ class _DateInfo extends StatelessWidget {
         children: [
           const Icon(Icons.event, size: 16, color: AppColors.grey500),
           const SizedBox(width: AppDimensions.space8),
-          Text(label, style: const TextStyle(color: AppColors.grey600)),
+          Text(label,
+              style: const TextStyle(color: AppColors.grey600)),
           const Spacer(),
-          Text('${date.day}/${date.month}/${date.year}', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text('${date.day}/${date.month}/${date.year}',
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
