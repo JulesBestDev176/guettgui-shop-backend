@@ -38,13 +38,23 @@ export class AuthService {
 
     let shopData: any = undefined;
     if (isSeller && dto.shopName) {
-      const freePlan = await this.prisma.plan.findUnique({ where: { code: 'FREE' } });
+      const [freePlan, regionRecord, cityRecord] = await Promise.all([
+        this.prisma.plan.findUnique({ where: { code: 'FREE' } }),
+        dto.region
+          ? this.prisma.region.findFirst({ where: { name: { equals: dto.region, mode: 'insensitive' } } })
+          : null,
+        dto.city
+          ? this.prisma.city.findFirst({ where: { name: { equals: dto.city, mode: 'insensitive' } } })
+          : null,
+      ]);
       const baseSlug = slugify(dto.shopName, { lower: true, strict: true });
       const shopSlug = await this.uniqueShopSlug(baseSlug);
       shopData = {
         create: {
           name: dto.shopName,
           slug: shopSlug,
+          ...(regionRecord && { regionId: regionRecord.id }),
+          ...(cityRecord && { cityId: cityRecord.id }),
           ...(freePlan && {
             subscription: { create: { planId: freePlan.id, status: 'ACTIVE' } },
           }),

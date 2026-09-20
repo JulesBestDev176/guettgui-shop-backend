@@ -24,6 +24,16 @@ export class RegisterDto {
   @IsOptional()
   shopName?: string;
 
+  @ApiPropertyOptional({ example: 'Dakar' })
+  @IsString()
+  @IsOptional()
+  region?: string;
+
+  @ApiPropertyOptional({ example: 'Yeumbeul' })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
   @ApiPropertyOptional({ enum: ['BUYER', 'SELLER'] })
   @IsIn(['BUYER', 'SELLER'])
   @IsOptional()
