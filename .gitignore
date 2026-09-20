@@ -1,42 +1,30 @@
-# API (NestJS)
-apps/api/node_modules/
-apps/api/dist/
-apps/api/.env
-apps/api/prisma/migrations/
-apps/marketplace-api/node_modules/
-apps/marketplace-api/dist/
-apps/marketplace-api/.env
+# Dependencies
+node_modules/
 
-# Mobile (Flutter)
-apps/mobile/.dart_tool/
-apps/mobile/.packages
-apps/mobile/build/
-apps/mobile/android/.gradle/
-apps/mobile/ios/Pods/
-apps/mobile/ios/.symlinks/
-apps/mobile/.flutter-plugins
-apps/mobile/.flutter-plugins-dependencies
+# Build output
+dist/
 
-# Web (React PWA)
-apps/web/node_modules/
-apps/web/dist/
-apps/web/.env
-
-# Backoffice (Next.js)
-apps/backoffice/node_modules/
-apps/backoffice/.next/
-apps/backoffice/.env
-
-# General
+# Local environment
 .env
+.env.local
 *.log
+
+# Runtime data
+uploads/
+
+# Editor and OS files
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.iml
 
-# Generated
-*.g.dart
-*.freezed.dart
+# Local leftovers from the previous monorepo layout
+apps/
+assets/
+design/
+docs/
+mobile/
+
+# Tooling
 .mcp.json
