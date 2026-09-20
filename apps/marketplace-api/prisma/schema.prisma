@@ -1,0 +1,487 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ══════════════════════════════════════════════════════════
+// UTILISATEURS
+// ══════════════════════════════════════════════════════════
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  phone        String     @unique
+  fullName     String
+  email        String?    @unique
+  passwordHash String
+  role         UserRole   @default(BUYER)
+  status       UserStatus @default(ACTIVE)
+  avatarUrl    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  refreshTokens RefreshToken[]
+  shop          Shop?
+  orders        Order[]
+  favorites     Favorite[]
+  reviews       Review[]
+  supportTickets SupportTicket[]
+  notifications  Notification[]
+
+  @@index([phone])
+  @@index([role, status])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ══════════════════════════════════════════════════════════
+// GÉOGRAPHIE
+// ══════════════════════════════════════════════════════════
+
+model Region {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  slug        String       @unique
+  departments Department[]
+  shops       Shop[]
+
+  @@index([slug])
+}
+
+model Department {
+  id       String @id @default(cuid())
+  name     String
+  slug     String
+  regionId String
+  cities   City[]
+  region   Region @relation(fields: [regionId], references: [id])
+
+  @@unique([slug, regionId])
+  @@index([regionId])
+}
+
+model City {
+  id           String     @id @default(cuid())
+  name         String
+  slug         String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  shops        Shop[]
+
+  @@unique([slug, departmentId])
+  @@index([departmentId])
+}
+
+// ══════════════════════════════════════════════════════════
+// CATÉGORIES
+// ══════════════════════════════════════════════════════════
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  iconUrl     String?
+  sortOrder   Int        @default(0)
+  parentId    String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+// ══════════════════════════════════════════════════════════
+// BOUTIQUES (SHOPS)
+// ══════════════════════════════════════════════════════════
+
+enum ShopStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+model Shop {
+  id          String     @id @default(cuid())
+  userId      String     @unique
+  name        String
+  slug        String     @unique
+  description String?
+  phone       String?
+  avatarUrl   String?
+  coverUrl    String?
+  regionId    String?
+  cityId      String?
+  address     String?
+  verified    Boolean    @default(false)
+  status      ShopStatus @default(PENDING)
+  since       String?
+  ratingAvg   Float      @default(0)
+  reviewCount Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+
+  user         User          @relation(fields: [userId], references: [id])
+  region       Region?       @relation(fields: [regionId], references: [id])
+  city         City?         @relation(fields: [cityId], references: [id])
+  products     Product[]
+  subscription Subscription?
+  tags         ShopTag[]
+
+  @@index([slug])
+  @@index([regionId])
+  @@index([status, verified])
+}
+
+model ShopTag {
+  id     String @id @default(cuid())
+  shopId String
+  name   String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, name])
+}
+
+// ══════════════════════════════════════════════════════════
+// PRODUITS
+// ══════════════════════════════════════════════════════════
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  OUT_OF_STOCK
+  SUSPENDED
+}
+
+model Product {
+  id          String        @id @default(cuid())
+  shopId      String
+  categoryId  String
+  name        String
+  slug        String        @unique
+  description String?
+  basePrice   Int
+  unit        String        @default("unité")
+  stock       Int           @default(0)
+  status      ProductStatus @default(DRAFT)
+  badge       String?
+  featured    Boolean       @default(false)
+  ratingAvg   Float         @default(0)
+  reviewCount Int           @default(0)
+  viewCount   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  shop         Shop          @relation(fields: [shopId], references: [id])
+  category     Category      @relation(fields: [categoryId], references: [id])
+  images       ProductImage[]
+  priceOptions PriceOption[]
+  orderItems   OrderItem[]
+  favorites    Favorite[]
+  reviews      Review[]
+
+  @@index([slug])
+  @@index([shopId, status])
+  @@index([categoryId, status])
+  @@index([featured, status])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  sortOrder Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model PriceOption {
+  id        String  @id @default(cuid())
+  productId String
+  label     String
+  price     Int
+  stock     Int?
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// ══════════════════════════════════════════════════════════
+// COMMANDES
+// ══════════════════════════════════════════════════════════
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  code            String      @unique @default(cuid())
+  userId          String?
+  customerName    String
+  customerPhone   String
+  deliveryAddress String
+  note            String?
+  status          OrderStatus @default(PENDING)
+  subtotal        Int
+  total           Int
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user    User?       @relation(fields: [userId], references: [id])
+  items   OrderItem[]
+  history OrderHistory[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([code])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  name      String
+  unitPrice Int
+  quantity  Int
+  total     Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+model OrderHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// ══════════════════════════════════════════════════════════
+// AVIS
+// ══════════════════════════════════════════════════════════
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@index([productId])
+}
+
+// ══════════════════════════════════════════════════════════
+// FAVORIS
+// ══════════════════════════════════════════════════════════
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+// ══════════════════════════════════════════════════════════
+// ABONNEMENTS & PLANS
+// ══════════════════════════════════════════════════════════
+
+enum PlanCode {
+  FREE
+  STANDARD
+  PRO
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  code          PlanCode @unique
+  name          String
+  description   String?
+  priceMonthly  Int      @default(0)
+  isActive      Boolean  @default(true)
+  maxProducts   Int      @default(10)
+  canBeVerified Boolean  @default(false)
+  canBeFeatured Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  shopId    String             @unique
+  planId    String
+  status    SubscriptionStatus @default(ACTIVE)
+  startDate DateTime           @default(now())
+  endDate   DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([shopId])
+}
+
+// ══════════════════════════════════════════════════════════
+// PARAMÈTRES SITE (SiteSettings)
+// ══════════════════════════════════════════════════════════
+
+model SiteSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+// ══════════════════════════════════════════════════════════
+// PAGES CMS
+// ══════════════════════════════════════════════════════════
+
+model CmsPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model FaqItem {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  audience  String   @default("all") // "all" | "buyer" | "seller"
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ══════════════════════════════════════════════════════════
+// SUPPORT
+// ══════════════════════════════════════════════════════════
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id        String       @id @default(cuid())
+  userId    String?
+  name      String
+  contact   String
+  subject   String
+  message   String
+  status    TicketStatus @default(OPEN)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([status])
+}
+
+// ══════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ══════════════════════════════════════════════════════════
+
+enum NotificationType {
+  ORDER_NEW
+  ORDER_CONFIRMED
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  REVIEW_RECEIVED
+  SHOP_VERIFIED
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
