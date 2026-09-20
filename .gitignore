@@ -3,6 +3,9 @@ apps/api/node_modules/
 apps/api/dist/
 apps/api/.env
 apps/api/prisma/migrations/
+apps/marketplace-api/node_modules/
+apps/marketplace-api/dist/
+apps/marketplace-api/.env
 
 # Mobile (Flutter)
 apps/mobile/.dart_tool/
