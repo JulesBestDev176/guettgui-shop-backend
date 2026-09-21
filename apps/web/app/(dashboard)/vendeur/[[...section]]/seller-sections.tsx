@@ -300,16 +300,16 @@ export function OverviewPage() {
             <p className="font-body mt-2 max-w-xl text-sm leading-6 text-[#D1D5DB]">
               Suivez vos ventes, preparez les commandes et gardez votre inventaire a jour.
             </p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link href="/vendeur/produits" className="inline-flex h-11 items-center justify-center gap-2 rounded-[11px] bg-[#22A849] px-5 text-sm font-bold text-white">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <Link href="/vendeur/produits" className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] px-4 text-sm font-bold text-white sm:h-11 sm:px-5">
                 <Plus size={16} />
                 Ajouter produit
               </Link>
-              <Link href="/vendeur/commandes" className="inline-flex h-11 items-center justify-center rounded-[11px] border border-white/15 bg-white/10 px-5 text-sm font-semibold text-white">
-                Voir commandes
+              <Link href="/vendeur/commandes" className="inline-flex h-10 items-center justify-center rounded-[10px] border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white sm:h-11 sm:px-5">
+                Commandes
               </Link>
-              <Link href="/vendeur/livraison" className="inline-flex h-11 items-center justify-center rounded-[11px] border border-white/15 bg-white/10 px-5 text-sm font-semibold text-white">
-                Zones livraison
+              <Link href="/vendeur/statistiques" className="inline-flex h-10 items-center justify-center rounded-[10px] border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white sm:h-11 sm:px-5">
+                Statistiques
               </Link>
             </div>
           </div>
@@ -580,7 +580,7 @@ export function ProductsPage() {
       {filtered.length === 0 ? (
         <EmptyState icon={Package} title="Aucun produit" description={products.length === 0 ? "Ajoutez votre premier produit pour commencer a vendre." : "Aucun produit ne correspond a votre recherche."} />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((product) => (
             <ProductCard
               key={product.id}
@@ -698,45 +698,46 @@ export function OrdersPage() {
         <div className="space-y-3">
           {orders.map((order) => (
             <div key={order.id} className="rounded-[16px] border border-[#E5E7EB] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-bold text-[#1F2937]">#{order.code}</p>
-                    <Badge className={`rounded-full px-3 py-1 text-xs ${STATUS_COLORS[order.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                    <Badge className={`rounded-full px-2.5 py-0.5 text-[11px] ${STATUS_COLORS[order.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
                       {STATUS_LABELS[order.status] ?? order.status}
                     </Badge>
                   </div>
-                  <p className="font-body mt-1 text-sm text-[#6B7280]">{order.customerName} · {order.customerPhone}</p>
-                  <p className="font-body mt-0.5 text-xs text-[#6B7280]">{order.deliveryAddress}</p>
+                  <p className="font-body mt-1 text-sm text-[#6B7280] truncate">{order.customerName}</p>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  <p className="text-xl font-extrabold text-[#22A849]">{order.total.toLocaleString()} F</p>
-                  <p className="font-body text-xs text-[#9CA3AF]">
-                    {new Date(order.createdAt).toLocaleDateString("fr-SN", { day: "numeric", month: "short", year: "numeric" })}
+                <div className="shrink-0 text-right">
+                  <p className="text-lg font-extrabold text-[#22A849]">{order.total.toLocaleString()} F</p>
+                  <p className="font-body text-[11px] text-[#9CA3AF]">
+                    {new Date(order.createdAt).toLocaleDateString("fr-SN", { day: "numeric", month: "short" })}
                   </p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="font-body text-xs text-[#6B7280]">
-                  {order.items.length} article{order.items.length > 1 ? "s" : ""} · {order.items.map((i) => i.name).join(", ")}
-                </p>
-                <div className="flex gap-2">
-                  {NEXT_STATUS[order.status] && (
-                    <button
-                      disabled={updating === order.id}
-                      onClick={() => handleAdvance(order)}
-                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-[#22A849] px-3 text-xs font-bold text-white disabled:opacity-60"
-                    >
-                      {updating === order.id ? "…" : NEXT_LABEL[order.status]}
-                    </button>
-                  )}
-                  <Link
-                    href={`/vendeur/commandes/${order.id}`}
-                    className="inline-flex h-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] px-3 text-xs font-bold text-[#1F2937] hover:border-[#22A849]"
+              {/* Details */}
+              <p className="font-body mt-2 text-xs text-[#9CA3AF] truncate">{order.deliveryAddress}</p>
+              <p className="font-body mt-0.5 text-xs text-[#6B7280] truncate">
+                {order.items.length} article{order.items.length > 1 ? "s" : ""} · {order.items.map((i) => i.name).join(", ")}
+              </p>
+              {/* Actions */}
+              <div className="mt-3 flex gap-2">
+                {NEXT_STATUS[order.status] && (
+                  <button
+                    disabled={updating === order.id}
+                    onClick={() => handleAdvance(order)}
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-[#22A849] text-xs font-bold text-white disabled:opacity-60"
                   >
-                    Détail
-                  </Link>
-                </div>
+                    {updating === order.id ? "…" : NEXT_LABEL[order.status]}
+                  </button>
+                )}
+                <Link
+                  href={`/vendeur/commandes/${order.id}`}
+                  className="inline-flex h-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] px-4 text-xs font-bold text-[#1F2937] hover:border-[#22A849]"
+                >
+                  Détail
+                </Link>
               </div>
             </div>
           ))}
