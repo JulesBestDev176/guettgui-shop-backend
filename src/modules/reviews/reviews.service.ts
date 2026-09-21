@@ -40,7 +40,7 @@ export class ReviewsService {
           rating: true,
           comment: true,
           createdAt: true,
-          user: { select: { fullName: true, avatarUrl: true } },
+          user: { select: { fullName: true } },
         },
       }),
       this.prisma.review.count({ where: { productId } }),

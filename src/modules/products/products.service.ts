@@ -25,7 +25,7 @@ const PRODUCT_SELECT = {
   viewCount: true,
   createdAt: true,
   category: { select: { id: true, name: true, slug: true } },
-  shop: { select: { id: true, name: true, slug: true, verified: true, avatarUrl: true } },
+  shop: { select: { id: true, name: true, slug: true, verified: true } },
   images: { orderBy: { sortOrder: 'asc' as const }, select: { id: true, url: true, sortOrder: true } },
   priceOptions: { select: { id: true, label: true, price: true, stock: true } },
 };
@@ -102,7 +102,7 @@ export class ProductsService {
             rating: true,
             comment: true,
             createdAt: true,
-            user: { select: { fullName: true, avatarUrl: true } },
+            user: { select: { fullName: true } },
           },
         },
       },

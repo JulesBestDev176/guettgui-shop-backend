@@ -136,7 +136,6 @@ export class AuthService {
         email: true,
         role: true,
         status: true,
-        avatarUrl: true,
         createdAt: true,
         shop: {
           select: {
@@ -145,7 +144,6 @@ export class AuthService {
             slug: true,
             status: true,
             verified: true,
-            avatarUrl: true,
             subscription: { select: { status: true, plan: { select: { code: true, name: true } } } },
           },
         },
