@@ -23,8 +23,8 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const [existingPhone, existingEmail] = await Promise.all([
-      this.prisma.user.findUnique({ where: { phone: dto.phone } }),
-      dto.email ? this.prisma.user.findUnique({ where: { email: dto.email } }) : null,
+      this.prisma.user.findUnique({ where: { phone: dto.phone }, select: { id: true } }),
+      dto.email ? this.prisma.user.findUnique({ where: { email: dto.email }, select: { id: true } }) : null,
     ]);
 
     if (existingPhone) throw new ConflictException('Ce numéro est déjà utilisé');

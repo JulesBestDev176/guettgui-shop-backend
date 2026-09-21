@@ -13,7 +13,6 @@ const SHOP_PUBLIC_SELECT = {
   slug: true,
   description: true,
   phone: true,
-  avatarUrl: true,
   coverUrl: true,
   address: true,
   since: true,
@@ -92,7 +91,7 @@ export class ShopsService {
   }
 
   async update(userId: string, dto: UpdateShopDto) {
-    const shop = await this.prisma.shop.findUnique({ where: { userId } });
+    const shop = await this.prisma.shop.findUnique({ where: { userId }, select: { id: true } });
     if (!shop) throw new NotFoundException('Boutique introuvable');
 
     return this.prisma.shop.update({
@@ -103,13 +102,13 @@ export class ShopsService {
   }
 
   async updateAvatar(userId: string, avatarUrl: string) {
-    const shop = await this.prisma.shop.findUnique({ where: { userId } });
+    const shop = await this.prisma.shop.findUnique({ where: { userId }, select: { id: true } });
     if (!shop) throw new NotFoundException('Boutique introuvable');
     return this.prisma.shop.update({ where: { id: shop.id }, data: { avatarUrl } });
   }
 
   async updateCover(userId: string, coverUrl: string) {
-    const shop = await this.prisma.shop.findUnique({ where: { userId } });
+    const shop = await this.prisma.shop.findUnique({ where: { userId }, select: { id: true } });
     if (!shop) throw new NotFoundException('Boutique introuvable');
     return this.prisma.shop.update({ where: { id: shop.id }, data: { coverUrl } });
   }
