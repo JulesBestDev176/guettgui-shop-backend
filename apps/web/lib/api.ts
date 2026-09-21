@@ -391,6 +391,8 @@ export async function updateMyShop(data: {
   cityId?: string;
   address?: string;
   since?: string;
+  avatarUrl?: string;
+  coverUrl?: string;
 }): Promise<Shop> {
   return request<Shop>("/shops/me", { method: "PATCH", body: JSON.stringify(data) });
 }

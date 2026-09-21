@@ -10,6 +10,7 @@ import {
   Edit3,
   Eye,
   EyeOff,
+  ImagePlus,
   Loader2,
   MapPin,
   Package,
@@ -41,6 +42,7 @@ import {
   getMyShop,
   updateMyShop,
   changePassword,
+  uploadImage,
 } from "@/lib/api";
 import type { Product, DeliveryZone, Order, OrderListResponse, Category } from "@/lib/types";
 
@@ -1173,7 +1175,7 @@ export function StatsPage() {
 
 export function SettingsPage() {
   const [user, setUser] = useState<{ fullName: string; phone: string; email: string | null; role: string; status: string } | null>(null);
-  const [shop, setShop] = useState<{ name: string; description: string | null; phone: string | null; address: string | null } | null>(null);
+  const [shop, setShop] = useState<{ name: string; description: string | null; phone: string | null; address: string | null; avatarUrl: string | null; coverUrl: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingShop, setEditingShop] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1183,6 +1185,9 @@ export function SettingsPage() {
   const [shopDesc, setShopDesc] = useState("");
   const [shopPhone, setShopPhone] = useState("");
   const [shopAddress, setShopAddress] = useState("");
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -1201,6 +1206,28 @@ export function SettingsPage() {
       }
     }).finally(() => setLoading(false));
   }, []);
+
+  const handleUploadAvatar = async (file: File) => {
+    setUploadingAvatar(true);
+    try {
+      const { url } = await uploadImage(file);
+      const updated = await updateMyShop({ avatarUrl: url });
+      setShop((prev) => prev ? { ...prev, avatarUrl: updated.avatarUrl ?? url } : prev);
+    } catch {} finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleUploadCover = async (file: File) => {
+    setUploadingCover(true);
+    try {
+      const { url } = await uploadImage(file);
+      const updated = await updateMyShop({ coverUrl: url });
+      setShop((prev) => prev ? { ...prev, coverUrl: updated.coverUrl ?? url } : prev);
+    } catch {} finally {
+      setUploadingCover(false);
+    }
+  };
 
   const handleSaveShop = async () => {
     setSaving(true);
@@ -1245,6 +1272,55 @@ export function SettingsPage() {
           <SettingBox icon={User} label="Nom complet" value={user?.fullName ?? "—"} />
           <SettingBox icon={Store} label="Téléphone" value={user?.phone ?? "—"} />
           <SettingBox icon={User} label="Email" value={user?.email ?? "Non renseigné"} />
+        </div>
+      </div>
+
+      {/* Photos de la boutique */}
+      <div className="mb-6 rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-[#1F2937]">Photos de la boutique</h2>
+            <p className="text-xs text-[#6B7280]">Optionnel — elles apparaissent sur votre page boutique publique.</p>
+          </div>
+        </div>
+
+        {/* Cover */}
+        <div className="relative mb-4 h-36 w-full overflow-hidden rounded-[14px] bg-[#F1F5F9]">
+          {shop?.coverUrl ? (
+            <img src={shop.coverUrl} alt="Couverture" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-[#CBD5E1]">
+              <ImagePlus size={32} />
+            </div>
+          )}
+          <label className={`absolute bottom-2 right-2 flex cursor-pointer items-center gap-1.5 rounded-[8px] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[#1F2937] shadow hover:bg-white transition-colors ${uploadingCover ? "pointer-events-none opacity-60" : ""}`}>
+            {uploadingCover ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+            {uploadingCover ? "Envoi…" : "Changer la couverture"}
+            <input type="file" accept="image/*" className="hidden" disabled={uploadingCover}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadCover(f); e.target.value = ""; }} />
+          </label>
+        </div>
+
+        {/* Avatar */}
+        <div className="flex items-center gap-4">
+          <div className="relative h-16 w-16 shrink-0">
+            {shop?.avatarUrl ? (
+              <img src={shop.avatarUrl} alt="Avatar" className="h-16 w-16 rounded-full object-cover border-2 border-[#E5E7EB]" />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#22A849] text-xl font-bold text-white border-2 border-[#E5E7EB]">
+                {user?.fullName?.charAt(0).toUpperCase() ?? "?"}
+              </div>
+            )}
+            <label className={`absolute -bottom-1 -right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-[#22A849] text-white shadow hover:bg-[#1a9a3d] transition-colors ${uploadingAvatar ? "pointer-events-none opacity-60" : ""}`}>
+              {uploadingAvatar ? <Loader2 size={11} className="animate-spin" /> : <ImagePlus size={11} />}
+              <input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadAvatar(f); e.target.value = ""; }} />
+            </label>
+          </div>
+          <div>
+            <p className="font-semibold text-[#1F2937]">{shop?.name ?? user?.fullName ?? "—"}</p>
+            <p className="text-xs text-[#6B7280]">Photo de profil de la boutique</p>
+          </div>
         </div>
       </div>
 
