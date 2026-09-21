@@ -34,8 +34,8 @@ export class RegisterDto {
   @IsOptional()
   city?: string;
 
-  @ApiPropertyOptional({ enum: ['BUYER', 'SELLER'] })
-  @IsIn(['BUYER', 'SELLER'])
+  @ApiPropertyOptional({ enum: ['CLIENT', 'SELLER'] })
+  @IsIn(['CLIENT', 'SELLER'])
   @IsOptional()
   role?: string;
 }

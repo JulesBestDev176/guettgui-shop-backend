@@ -34,7 +34,7 @@ export class AuthService {
 
     // Determine role — if shopName provided, default to SELLER
     const isSeller = dto.role === 'SELLER' || (!dto.role && !!dto.shopName);
-    const role: 'BUYER' | 'SELLER' = isSeller ? 'SELLER' : 'BUYER';
+    const role: 'CLIENT' | 'SELLER' = isSeller ? 'SELLER' : 'CLIENT';
 
     let shopData: any = undefined;
     if (isSeller && dto.shopName) {

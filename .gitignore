@@ -20,7 +20,8 @@ Thumbs.db
 *.iml
 
 # Local leftovers from the previous monorepo layout
-apps/
+apps/api/
+apps/mobile/
 assets/
 design/
 docs/
