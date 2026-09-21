@@ -343,19 +343,17 @@ export function OverviewPage() {
 
       {/* ── Onboarding banner (shown until first product added) ── */}
       {!hasProducts && (
-        <div className="flex flex-col gap-3 rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] p-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22A849]/10">
-              <Store size={20} className="text-[#22A849]" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-[#15803D]">Votre boutique est prête à démarrer</p>
-              <p className="mt-0.5 text-sm text-[#166534]">Commencez par ajouter vos premiers produits pour recevoir des commandes.</p>
-            </div>
+        <div className="flex items-center gap-3 rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22A849]/10">
+            <Store size={20} className="text-[#22A849]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-[#15803D]">Votre boutique est prête à démarrer</p>
+            <p className="mt-0.5 text-xs text-[#166534]">Commencez par ajouter vos premiers produits pour recevoir des commandes.</p>
           </div>
           <Link
             href="/vendeur/produits"
-            className="self-start rounded-[8px] bg-[#22A849] px-4 py-2 text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors sm:self-auto sm:shrink-0"
+            className="shrink-0 rounded-[8px] bg-[#22A849] px-3 py-2 text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors"
           >
             Commencer
           </Link>
