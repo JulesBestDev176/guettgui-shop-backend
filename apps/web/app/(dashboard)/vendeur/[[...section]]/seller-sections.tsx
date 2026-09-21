@@ -35,12 +35,14 @@ import {
   updateOrderStatus,
   updateSellerProduct,
   deleteSellerProduct,
+  createSellerProduct,
+  listCategories,
   getMe,
   getMyShop,
   updateMyShop,
   changePassword,
 } from "@/lib/api";
-import type { Product, DeliveryZone, Order, OrderListResponse } from "@/lib/types";
+import type { Product, DeliveryZone, Order, OrderListResponse, Category } from "@/lib/types";
 
 // ── Shared UI helpers (pure, no data) ──
 
@@ -299,7 +301,7 @@ export function OverviewPage() {
               Suivez vos ventes, preparez les commandes et gardez votre inventaire a jour.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link href="/vendeur/produits/ajouter" className="inline-flex h-11 items-center justify-center gap-2 rounded-[11px] bg-[#22A849] px-5 text-sm font-bold text-white">
+              <Link href="/vendeur/produits" className="inline-flex h-11 items-center justify-center gap-2 rounded-[11px] bg-[#22A849] px-5 text-sm font-bold text-white">
                 <Plus size={16} />
                 Ajouter produit
               </Link>
@@ -404,6 +406,110 @@ export function OverviewPage() {
   );
 }
 
+// ── Add Product Form ──
+
+function AddProductForm({ onAdded, onCancel }: { onAdded: (p: Product) => void; onCancel: () => void }) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [basePrice, setBasePrice] = useState("");
+  const [unit, setUnit] = useState("kg");
+  const [stock, setStock] = useState("1");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    listCategories().then((cats) => {
+      setCategories(cats);
+      if (cats.length > 0) setCategoryId(cats[0].id);
+    }).catch(() => {});
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!name.trim() || !categoryId || !basePrice) {
+      setError("Nom, catégorie et prix sont requis");
+      return;
+    }
+    setSaving(true);
+    try {
+      const product = await createSellerProduct({
+        name: name.trim(),
+        categoryId,
+        basePrice: parseFloat(basePrice),
+        unit: unit.trim() || "kg",
+        stock: parseInt(stock) || 0,
+        description: description.trim() || undefined,
+      });
+      onAdded(product);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la création");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-6 rounded-[18px] border border-[#22A849]/30 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.06)]">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-[#1F2937]">Nouveau produit</h2>
+        <button onClick={onCancel} className="rounded-lg p-1.5 text-[#9CA3AF] hover:bg-[#F1F5F9] hover:text-[#1F2937]">
+          <ArrowLeft size={16} />
+        </button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && <div className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="text-xs font-semibold text-[#6B7280]">Nom du produit *</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="ex. Tomates fraîches"
+              className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849]" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#6B7280]">Catégorie *</label>
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required
+              className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849]">
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#6B7280]">Prix (FCFA) *</label>
+            <input value={basePrice} onChange={(e) => setBasePrice(e.target.value)} required type="number" min="0" placeholder="ex. 5000"
+              className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#6B7280]">Unité</label>
+            <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="kg, pièce, litre…"
+              className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849]" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#6B7280]">Stock initial</label>
+            <input value={stock} onChange={(e) => setStock(e.target.value)} type="number" min="0" placeholder="0"
+              className="h-11 w-full rounded-[12px] border border-[#E5E7EB] px-3 text-sm outline-none focus:border-[#22A849] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+          </div>
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="text-xs font-semibold text-[#6B7280]">Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Description courte du produit"
+              className="w-full rounded-[12px] border border-[#E5E7EB] px-3 py-2 text-sm outline-none focus:border-[#22A849] resize-none" />
+          </div>
+        </div>
+        <div className="flex gap-3 pt-1">
+          <button type="submit" disabled={saving}
+            className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] text-sm font-bold text-white disabled:opacity-60">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <><Plus size={15} /> Créer le produit</>}
+          </button>
+          <button type="button" onClick={onCancel}
+            className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#E5E7EB] px-4 text-sm font-semibold text-[#6B7280]">
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ── Products Page ──
 
 export function ProductsPage() {
@@ -411,6 +517,7 @@ export function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [showAddForm, setShowAddForm] = useState(false);
 
   useEffect(() => {
     getSellerProducts()
@@ -432,8 +539,23 @@ export function ProductsPage() {
       <PageHeader
         title="Mes produits"
         subtitle="Ajoutez, modifiez et suivez vos produits disponibles."
-        action={<Link href="/vendeur/produits/ajouter" className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] px-4 text-sm font-bold text-white"><Plus size={16} /> Ajouter</Link>}
+        action={
+          !showAddForm ? (
+            <button onClick={() => setShowAddForm(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] px-4 text-sm font-bold text-white">
+              <Plus size={16} /> Ajouter produit
+            </button>
+          ) : null
+        }
       />
+      {showAddForm && (
+        <AddProductForm
+          onAdded={(product) => {
+            setProducts((prev) => [product, ...prev]);
+            setShowAddForm(false);
+          }}
+          onCancel={() => setShowAddForm(false)}
+        />
+      )}
       <div className="mb-5 grid gap-4 md:grid-cols-[1fr_auto]">
         <div className="flex h-11 items-center gap-2 rounded-[12px] border border-[#E5E7EB] bg-white px-3">
           <Search size={17} className="text-[#9CA3AF]" />
@@ -1096,6 +1218,70 @@ export function SettingsPage() {
 
         <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
           <h2 className="mb-5 text-lg font-bold text-[#1F2937]">Sécurité</h2>
+          <ChangePasswordForm />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Profile Page ──
+
+export function ProfilePage() {
+  const [user, setUser] = useState<{ fullName: string; phone: string; email: string | null; role: string; status: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    getMe()
+      .then((u) => setUser(u))
+      .catch(() => {
+        try {
+          const stored = localStorage.getItem("gg-user");
+          if (stored) setUser(JSON.parse(stored));
+        } catch {}
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <LoadingSkeleton />;
+
+  return (
+    <>
+      <PageHeader title="Mon profil" subtitle="Vos informations personnelles et securite du compte." />
+      <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+          <div className="mb-5 flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#22A849] text-2xl font-bold text-white">
+              {user?.fullName?.charAt(0).toUpperCase() ?? "?"}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-[#1F2937]">{user?.fullName ?? "—"}</h2>
+              <p className="font-body text-sm text-[#6B7280]">{user?.role === "SELLER" ? "Vendeur" : user?.role ?? "—"}</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <SettingBox icon={User} label="Nom complet" value={user?.fullName ?? "—"} />
+            <SettingBox icon={Store} label="Téléphone" value={user?.phone ?? "—"} />
+            <SettingBox icon={User} label="Email" value={user?.email ?? "Non renseigné"} />
+            <SettingBox icon={ShieldCheck} label="Statut"
+              value={user?.status === "ACTIVE" ? "Compte actif" : user?.status === "PENDING" ? "En attente" : user?.status ?? "—"} />
+          </div>
+          {!editing && (
+            <button onClick={() => setEditing(true)}
+              className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#E5E7EB] px-4 text-sm font-bold text-[#1F2937] hover:border-[#22A849] hover:text-[#22A849]">
+              <Edit3 size={14} /> Modifier le profil
+            </button>
+          )}
+          {editing && (
+            <p className="mt-4 rounded-[10px] bg-[#FFF7ED] px-3 py-2 text-sm text-[#C2410C]">
+              La modification du profil sera disponible prochainement.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+          <h2 className="mb-5 text-lg font-bold text-[#1F2937]">Changer le mot de passe</h2>
           <ChangePasswordForm />
         </div>
       </div>
