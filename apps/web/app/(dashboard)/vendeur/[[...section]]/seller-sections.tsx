@@ -60,14 +60,15 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
 
 export function StatCard({ label, value, sub, icon: Icon, color }: { label: string; value: string; sub: string; icon: React.ElementType; color: string }) {
   return (
-    <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-      <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-[10px] ${color}`}>
-        <Icon size={19} />
+    <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-3 shadow-[0_2px_8px_rgba(0,0,0,.04)] md:p-4">
+      <div className={`mb-3 flex h-8 w-8 items-center justify-center rounded-[8px] md:h-10 md:w-10 md:rounded-[10px] ${color}`}>
+        <Icon size={16} className="md:hidden" />
+        <Icon size={19} className="hidden md:block" />
       </div>
-      <p className="text-2xl font-extrabold text-[#1F2937]">{value}</p>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="font-body text-xs text-[#6B7280]">{label}</p>
-        <span className="rounded-full bg-[#FAFAFA] px-2 py-0.5 text-[10px] font-bold text-[#6B7280]">{sub}</span>
+      <p className="text-xl font-extrabold text-[#1F2937] md:text-2xl">{value}</p>
+      <div className="mt-1 flex items-center justify-between gap-1">
+        <p className="text-[11px] text-[#6B7280] md:text-xs">{label}</p>
+        <span className="rounded-full bg-[#FAFAFA] px-1.5 py-0.5 text-[9px] font-bold text-[#6B7280] md:px-2 md:text-[10px]">{sub}</span>
       </div>
     </div>
   );
@@ -311,28 +312,28 @@ export function OverviewPage() {
   // we don't track zones/shop completion from here, leave them as to-do
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
 
       {/* ── Header: date + greeting + actions ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-widest text-[#94A3B8]">{today}</p>
-          <h1 className="mt-0.5 text-2xl font-extrabold tracking-[-0.4px] text-[#1E293B] md:text-3xl">
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-[-0.4px] text-[#1E293B] sm:text-2xl md:text-3xl">
             Bonjour {firstName} 👋
           </h1>
           <p className="mt-1 text-sm text-[#64748B]">Voici un aperçu de votre boutique aujourd&apos;hui.</p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
           <Link
             href="/"
-            className="flex h-9 items-center gap-1.5 rounded-[10px] border border-[#E2E8F0] bg-white px-3 text-sm font-semibold text-[#1E293B] hover:bg-[#F8FAFC] transition-colors"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[#E2E8F0] bg-white px-3 text-sm font-semibold text-[#1E293B] hover:bg-[#F8FAFC] transition-colors"
           >
             Voir ma boutique
             <TrendingUp size={13} className="text-[#94A3B8]" />
           </Link>
           <Link
             href="/vendeur/produits"
-            className="flex h-9 items-center gap-1.5 rounded-[10px] bg-[#22A849] px-3 text-sm font-semibold text-white hover:bg-[#1a9a3d] transition-colors"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-[#22A849] px-3 text-sm font-semibold text-white hover:bg-[#1a9a3d] transition-colors"
           >
             <Plus size={14} />
             Ajouter un produit
@@ -342,17 +343,19 @@ export function OverviewPage() {
 
       {/* ── Onboarding banner (shown until first product added) ── */}
       {!hasProducts && (
-        <div className="flex items-start gap-4 rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22A849]/10">
-            <Store size={20} className="text-[#22A849]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[#15803D]">Votre boutique est prête à démarrer</p>
-            <p className="mt-0.5 text-sm text-[#166534]">Commencez par ajouter vos premiers produits pour recevoir des commandes.</p>
+        <div className="flex flex-col gap-3 rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] p-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22A849]/10">
+              <Store size={20} className="text-[#22A849]" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-[#15803D]">Votre boutique est prête à démarrer</p>
+              <p className="mt-0.5 text-sm text-[#166534]">Commencez par ajouter vos premiers produits pour recevoir des commandes.</p>
+            </div>
           </div>
           <Link
             href="/vendeur/produits"
-            className="shrink-0 rounded-[8px] bg-[#22A849] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors"
+            className="self-start rounded-[8px] bg-[#22A849] px-4 py-2 text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors sm:self-auto sm:shrink-0"
           >
             Commencer
           </Link>
@@ -360,7 +363,7 @@ export function OverviewPage() {
       )}
 
       {/* ── KPI cards ── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="CA ce mois" value={dashboard ? `${Math.round(dashboard.revenueMonth / 1000)}K` : "0"} sub="FCFA" icon={Wallet} color="bg-[#F0FDF4] text-[#22A849]" />
         <StatCard label="Commandes" value={String(dashboard?.ordersCount ?? 0)} sub="total" icon={ShoppingBag} color="bg-[#EFF6FF] text-[#2563EB]" />
         <StatCard label="Produits actifs" value={String(dashboard?.activeProducts ?? 0)} sub={`/ ${products.length}`} icon={Package} color="bg-[#DCFCE7] text-[#15803D]" />
@@ -368,7 +371,7 @@ export function OverviewPage() {
       </div>
 
       {/* ── Bottom grid: commandes (left) + produits + prochaines étapes (right) ── */}
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
 
         {/* Commandes récentes */}
         <div className="rounded-[18px] border border-[#E2E8F0] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)] md:p-5">
