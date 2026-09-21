@@ -113,7 +113,7 @@ model Category {
   parentId    String?
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  updatedAt   DateTime   @default(now()) @updatedAt
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
@@ -375,16 +375,16 @@ enum SubscriptionStatus {
 
 model Subscription {
   id        String             @id @default(cuid())
-  shopId    String             @unique
-  planId    String
+  shopId    String?            @unique
+  planId    String?
   status    SubscriptionStatus @default(ACTIVE)
   startDate DateTime           @default(now())
   endDate   DateTime?
   createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  updatedAt DateTime           @default(now()) @updatedAt
 
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  plan Plan @relation(fields: [planId], references: [id])
+  shop Shop? @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  plan Plan? @relation(fields: [planId], references: [id])
 
   @@index([shopId])
 }
