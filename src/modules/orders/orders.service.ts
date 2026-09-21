@@ -140,14 +140,10 @@ export class OrdersService {
       throw new BadRequestException(`Transition de ${order.status} vers ${dto.status} non autorisée`);
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.order.update({
-        where: { id },
-        data: { status: dto.status },
-        select: ORDER_SELECT,
-      });
-      await tx.orderHistory.create({ data: { orderId: id, status: dto.status, note: dto.note } });
-      return updated;
+    return this.prisma.order.update({
+      where: { id },
+      data: { status: dto.status },
+      select: ORDER_SELECT,
     });
   }
 }

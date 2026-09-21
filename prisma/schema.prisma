@@ -271,7 +271,6 @@ model Order {
 
   user    User?       @relation(fields: [userId], references: [id])
   items   OrderItem[]
-  history OrderHistory[]
 
   @@index([userId])
   @@index([status])
@@ -293,17 +292,6 @@ model OrderItem {
   @@index([orderId])
 }
 
-model OrderHistory {
-  id        String      @id @default(cuid())
-  orderId   String
-  status    OrderStatus
-  note      String?
-  createdAt DateTime    @default(now())
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-}
 
 // ══════════════════════════════════════════════════════════
 // AVIS
