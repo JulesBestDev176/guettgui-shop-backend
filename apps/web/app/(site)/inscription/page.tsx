@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, User, Store, Loader2 } from "lucide-react";
+import { ArrowRight, User, Store, Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/primitives";
 import { register } from "@/lib/api";
@@ -23,6 +23,7 @@ export default function InscriptionPage() {
   const [shopName, setShopName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const selectedProfile = profiles.find((p) => p.id === profile)!;
 
@@ -134,13 +135,24 @@ export default function InscriptionPage() {
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-ink-light">Mot de passe</label>
-          <Input
-            placeholder="Minimum 8 caracteres"
-            type="password"
-            value={password}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-            required
-          />
+          <div className="relative">
+            <Input
+              placeholder="Minimum 8 caracteres"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+              required
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
         </div>
 
         {profile === "vendeur" && (
