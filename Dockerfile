@@ -16,4 +16,4 @@ COPY package.json ./
 RUN mkdir -p uploads
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["node", "dist/main"]
