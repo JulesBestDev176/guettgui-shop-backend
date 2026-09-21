@@ -16,6 +16,7 @@ enum UserRole {
   BUYER
   SELLER
   ADMIN
+  DELIVERY
 }
 
 enum UserStatus {
@@ -253,6 +254,17 @@ enum OrderStatus {
   READY
   DELIVERED
   CANCELLED
+  // Legacy values kept for live DB compatibility
+  CREATED
+  PAYMENT_PENDING
+  PAID
+  SELLER_CONFIRMED
+  READY_FOR_PICKUP
+  DELIVERY_ASSIGNED
+  PICKED_UP
+  IN_DELIVERY
+  DISPUTED
+  REFUNDED
 }
 
 model Order {
@@ -360,6 +372,7 @@ enum SubscriptionStatus {
   ACTIVE
   EXPIRED
   CANCELLED
+  TRIAL
 }
 
 model Subscription {
