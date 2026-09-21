@@ -302,28 +302,6 @@ export function OverviewPage() {
           <p className="font-body text-xs text-[#9CA3AF] uppercase tracking-wide">Tableau de bord</p>
           <h1 className="mt-1 text-xl font-extrabold tracking-[-0.3px] md:text-2xl">{userName}</h1>
 
-          {/* Inline KPI row */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
-              <p className="font-body text-[10px] text-[#9CA3AF]">CA total</p>
-              <p className="mt-0.5 text-base font-extrabold text-[#22A849]">
-                {dashboard ? `${(dashboard.revenueMonth / 1000).toFixed(0)}K F` : "—"}
-              </p>
-            </div>
-            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
-              <p className="font-body text-[10px] text-[#9CA3AF]">Commandes</p>
-              <p className="mt-0.5 text-base font-extrabold text-white">{dashboard?.ordersCount ?? 0}</p>
-            </div>
-            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
-              <p className="font-body text-[10px] text-[#9CA3AF]">Produits actifs</p>
-              <p className="mt-0.5 text-base font-extrabold text-white">{dashboard?.activeProducts ?? 0}</p>
-            </div>
-            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
-              <p className="font-body text-[10px] text-[#9CA3AF]">Stock total</p>
-              <p className="mt-0.5 text-base font-extrabold text-white">{products.length}</p>
-            </div>
-          </div>
-
           {/* Action buttons */}
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/vendeur/produits"
