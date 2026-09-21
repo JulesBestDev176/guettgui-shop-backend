@@ -86,7 +86,6 @@ export class OrdersService {
         subtotal,
         total,
         items: { create: orderItems },
-        history: { create: { status: OrderStatus.PENDING, note: 'Commande créée' } },
       },
       select: ORDER_SELECT,
     });
