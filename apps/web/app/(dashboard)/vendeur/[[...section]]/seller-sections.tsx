@@ -528,6 +528,10 @@ export function ProductsPage() {
 
   if (loading) return <LoadingSkeleton />;
 
+  const activeCount = products.filter((p) => p.status === "ACTIVE").length;
+  const ruptureCount = products.filter((p) => p.status === "OUT_OF_STOCK").length;
+  const draftCount = products.filter((p) => p.status === "DRAFT").length;
+
   const filtered = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || (statusFilter === "active" && p.status === "ACTIVE") || (statusFilter === "rupture" && p.status === "OUT_OF_STOCK");
@@ -547,6 +551,12 @@ export function ProductsPage() {
           ) : null
         }
       />
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total produits" value={String(products.length)} sub="catalogue" icon={Package} color="bg-[#EFF6FF] text-[#2563EB]" />
+        <StatCard label="Actifs" value={String(activeCount)} sub="en vente" icon={TrendingUp} color="bg-[#F0FDF4] text-[#22A849]" />
+        <StatCard label="Rupture de stock" value={String(ruptureCount)} sub="à réappro" icon={ShoppingBag} color="bg-[#FFF7ED] text-[#C2410C]" />
+        <StatCard label="Brouillons" value={String(draftCount)} sub="non publiés" icon={Star} color="bg-[#F5F3FF] text-[#7C3AED]" />
+      </div>
       {showAddForm && (
         <AddProductForm
           onAdded={(product) => {
@@ -653,6 +663,10 @@ export function OrdersPage() {
   if (loading) return <LoadingSkeleton />;
 
   const orders = result?.data ?? [];
+  const pending = orders.filter((o) => o.status === "PENDING").length;
+  const inProgress = orders.filter((o) => ["CONFIRMED", "PREPARING"].includes(o.status)).length;
+  const ready = orders.filter((o) => o.status === "READY").length;
+  const totalRevenue = orders.filter((o) => o.status === "DELIVERED").reduce((sum, o) => sum + o.total, 0);
 
   return (
     <>
@@ -672,6 +686,12 @@ export function OrdersPage() {
           </select>
         }
       />
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total commandes" value={String(orders.length)} sub="chargées" icon={ShoppingBag} color="bg-[#EFF6FF] text-[#2563EB]" />
+        <StatCard label="En attente" value={String(pending)} sub="à traiter" icon={Clock} color="bg-[#FFF7ED] text-[#C2410C]" />
+        <StatCard label="En cours" value={String(inProgress + ready)} sub="en préparation" icon={TrendingUp} color="bg-[#F5F3FF] text-[#7C3AED]" />
+        <StatCard label="CA livré" value={totalRevenue > 0 ? `${Math.round(totalRevenue / 1000)}K` : "0"} sub="FCFA" icon={Wallet} color="bg-[#F0FDF4] text-[#22A849]" />
+      </div>
       {orders.length === 0 ? (
         <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes de vos clients apparaitront ici au fur et a mesure des achats." />
       ) : (
