@@ -259,19 +259,33 @@ function ProductCard({
 
 // ── Overview Page ──
 
+const DAYS_FR = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const MONTHS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+function formatDateFr(d: Date) {
+  return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+const ONBOARDING_STEPS = [
+  { key: "product", label: "Ajouter votre premier produit", href: "/vendeur/produits" },
+  { key: "zone",    label: "Définir vos zones de livraison", href: "/vendeur/livraison" },
+  { key: "shop",    label: "Compléter votre profil boutique", href: "/vendeur/parametres" },
+];
+
 export function OverviewPage() {
   const [dashboard, setDashboard] = useState<{ revenueMonth: number; ordersCount: number; activeProducts: number; ratingAverage: number } | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("Ma boutique");
+  const [userName, setUserName] = useState("");
+  const today = formatDateFr(new Date());
+  const firstName = userName.split(" ")[0] || "vous";
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem("gg-user");
       if (stored) {
         const u = JSON.parse(stored);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (u.fullName) setUserName(u.fullName);
         else if (u.shopName) setUserName(u.shopName);
       }
@@ -289,36 +303,61 @@ export function OverviewPage() {
 
   if (loading) return <LoadingSkeleton />;
 
+  const hasProducts = products.length > 0;
+
+  // Determine completed onboarding steps
+  const completedSteps = new Set<string>();
+  if (hasProducts) completedSteps.add("product");
+  // we don't track zones/shop completion from here, leave them as to-do
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
 
-      {/* ── Hero card ── */}
-      <div className="relative overflow-hidden rounded-[18px] bg-[#1F2937] p-5 text-white shadow-[0_8px_24px_rgba(31,41,55,.18)] md:p-6">
-        {/* Decorative blobs */}
-        <div className="pointer-events-none absolute -right-6 -top-6 h-36 w-36 rounded-full bg-[#22A849]/20" />
-        <div className="pointer-events-none absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-[#22A849]/10" />
-
-        <div className="relative">
-          <p className="font-body text-xs text-[#9CA3AF] uppercase tracking-wide">Tableau de bord</p>
-          <h1 className="mt-1 text-xl font-extrabold tracking-[-0.3px] md:text-2xl">{userName}</h1>
-
-          {/* Action buttons */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <Link href="/vendeur/produits"
-              className="flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-[#22A849] text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors">
-              <Plus size={14} /> Ajouter
-            </Link>
-            <Link href="/vendeur/commandes"
-              className="flex h-9 items-center justify-center rounded-[9px] border border-white/20 bg-white/10 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
-              Commandes
-            </Link>
-            <Link href="/vendeur/statistiques"
-              className="flex h-9 items-center justify-center rounded-[9px] border border-white/20 bg-white/10 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
-              Stats
-            </Link>
-          </div>
+      {/* ── Header: date + greeting + actions ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#94A3B8]">{today}</p>
+          <h1 className="mt-0.5 text-2xl font-extrabold tracking-[-0.4px] text-[#1E293B] md:text-3xl">
+            Bonjour {firstName} 👋
+          </h1>
+          <p className="mt-1 text-sm text-[#64748B]">Voici un aperçu de votre boutique aujourd&apos;hui.</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Link
+            href="/"
+            className="flex h-9 items-center gap-1.5 rounded-[10px] border border-[#E2E8F0] bg-white px-3 text-sm font-semibold text-[#1E293B] hover:bg-[#F8FAFC] transition-colors"
+          >
+            Voir ma boutique
+            <TrendingUp size={13} className="text-[#94A3B8]" />
+          </Link>
+          <Link
+            href="/vendeur/produits"
+            className="flex h-9 items-center gap-1.5 rounded-[10px] bg-[#22A849] px-3 text-sm font-semibold text-white hover:bg-[#1a9a3d] transition-colors"
+          >
+            <Plus size={14} />
+            Ajouter un produit
+          </Link>
         </div>
       </div>
+
+      {/* ── Onboarding banner (shown until first product added) ── */}
+      {!hasProducts && (
+        <div className="flex items-start gap-4 rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22A849]/10">
+            <Store size={20} className="text-[#22A849]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[#15803D]">Votre boutique est prête à démarrer</p>
+            <p className="mt-0.5 text-sm text-[#166534]">Commencez par ajouter vos premiers produits pour recevoir des commandes.</p>
+          </div>
+          <Link
+            href="/vendeur/produits"
+            className="shrink-0 rounded-[8px] bg-[#22A849] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors"
+          >
+            Commencer
+          </Link>
+        </div>
+      )}
 
       {/* ── KPI cards ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -328,66 +367,103 @@ export function OverviewPage() {
         <StatCard label="Note moyenne" value={dashboard?.ratingAverage ? dashboard.ratingAverage.toFixed(1) : "—"} sub="/ 5" icon={Star} color="bg-[#FFF7ED] text-[#C2410C]" />
       </div>
 
-      {/* ── Commandes récentes + Inventaire ── */}
+      {/* ── Bottom grid: commandes (left) + produits + prochaines étapes (right) ── */}
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
 
         {/* Commandes récentes */}
-        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)] md:p-5">
+        <div className="rounded-[18px] border border-[#E2E8F0] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)] md:p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-bold text-[#1F2937] md:text-lg">Commandes récentes</h2>
-            <Link href="/vendeur/commandes" className="text-xs font-bold text-[#22A849] hover:underline">Voir tout</Link>
+            <h2 className="text-base font-bold text-[#1E293B]">Commandes récentes</h2>
+            <Link href="/vendeur/commandes" className="text-xs font-semibold text-[#22A849] hover:underline">Voir tout</Link>
           </div>
           {recentOrders.length === 0 ? (
-            <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes apparaitront ici." />
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F5F9]">
+                <ShoppingBag size={20} className="text-[#94A3B8]" />
+              </div>
+              <p className="text-sm font-semibold text-[#1E293B]">Aucune commande</p>
+              <p className="mt-1 text-xs text-[#94A3B8]">Les commandes apparaîtront ici.</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {recentOrders.map((order) => (
                 <Link key={order.id} href={`/vendeur/commandes/${order.id}`}
-                  className="flex items-center gap-3 rounded-[12px] bg-[#FAFAFA] p-3 hover:bg-[#F0FDF4] transition-colors">
+                  className="flex items-center gap-3 rounded-[12px] bg-[#F8FAFC] p-3 hover:bg-[#F0FDF4] transition-colors">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#EFF6FF]">
+                    <ShoppingBag size={15} className="text-[#2563EB]" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-[#1F2937]">#{order.code}</p>
+                      <p className="text-sm font-semibold text-[#1E293B]">#{order.code}</p>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_COLORS[order.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
                         {STATUS_LABELS[order.status] ?? order.status}
                       </span>
                     </div>
-                    <p className="font-body mt-0.5 text-xs text-[#6B7280] truncate">{order.customerName}</p>
+                    <p className="mt-0.5 text-xs text-[#94A3B8] truncate">{order.customerName}</p>
                   </div>
-                  <p className="text-sm font-bold text-[#22A849] shrink-0">{order.total.toLocaleString()} F</p>
+                  <p className="shrink-0 text-sm font-bold text-[#22A849]">{order.total.toLocaleString()} F</p>
                 </Link>
               ))}
             </div>
           )}
         </div>
 
-        {/* Inventaire rapide */}
-        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)] md:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-bold text-[#1F2937] md:text-lg">Inventaire</h2>
-            <Link href="/vendeur/produits" className="text-xs font-bold text-[#22A849] hover:underline">Gérer</Link>
-          </div>
-          {products.length === 0 ? (
-            <EmptyState icon={Package} title="Aucun produit" description="Ajoutez votre premier produit." />
-          ) : (
-            <div className="space-y-2">
-              {products.slice(0, 5).map((product) => {
-                const image = product.images?.[0]?.url ?? "/placeholder-product.jpg";
-                const rupture = product.stock === 0;
-                return (
-                  <div key={product.id} className="flex items-center gap-3 rounded-[12px] bg-[#FAFAFA] p-2.5">
-                    <img src={image} alt={product.name} className="h-10 w-10 shrink-0 rounded-[8px] object-cover" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-[#1F2937]">{product.name}</p>
-                      <p className={`font-body text-xs ${rupture ? "text-red-500" : "text-[#6B7280]"}`}>
-                        {rupture ? "Rupture" : `${product.stock} en stock`}
-                      </p>
+        {/* Right column */}
+        <div className="space-y-4">
+
+          {/* Vos produits */}
+          <div className="rounded-[18px] border border-[#E2E8F0] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold text-[#1E293B]">Vos produits</h2>
+              <Link href="/vendeur/produits" className="text-xs font-semibold text-[#22A849] hover:underline">Gérer</Link>
+            </div>
+            {products.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#F1F5F9]">
+                  <Package size={18} className="text-[#94A3B8]" />
+                </div>
+                <p className="text-xs text-[#94A3B8]">Aucun produit pour l&apos;instant</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {products.slice(0, 4).map((product) => {
+                  const image = product.images?.[0]?.url ?? "/placeholder-product.jpg";
+                  const rupture = product.stock === 0;
+                  return (
+                    <div key={product.id} className="flex items-center gap-3 rounded-[10px] bg-[#F8FAFC] p-2">
+                      <img src={image} alt={product.name} className="h-9 w-9 shrink-0 rounded-[8px] object-cover" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-[#1E293B]">{product.name}</p>
+                        <p className={`text-xs ${rupture ? "text-red-500" : "text-[#94A3B8]"}`}>
+                          {rupture ? "Rupture" : `${product.stock} en stock`}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-xs font-bold text-[#22A849]">{product.basePrice.toLocaleString()} F</p>
                     </div>
-                    <p className="text-xs font-bold text-[#22A849] shrink-0">{product.basePrice.toLocaleString()} F</p>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Prochaines étapes */}
+          <div className="rounded-[18px] border border-[#E2E8F0] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+            <h2 className="mb-3 text-base font-bold text-[#1E293B]">Prochaines étapes</h2>
+            <div className="space-y-2">
+              {ONBOARDING_STEPS.map(({ key, label, href }, idx) => {
+                const done = completedSteps.has(key);
+                return (
+                  <Link key={key} href={href}
+                    className="flex items-center gap-3 rounded-[10px] p-2.5 hover:bg-[#F8FAFC] transition-colors">
+                    <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? "bg-[#22A849] text-white" : "bg-[#F1F5F9] text-[#94A3B8]"}`}>
+                      {done ? "✓" : idx + 1}
+                    </div>
+                    <p className={`flex-1 text-sm ${done ? "text-[#94A3B8] line-through" : "font-medium text-[#1E293B]"}`}>{label}</p>
+                  </Link>
                 );
               })}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
