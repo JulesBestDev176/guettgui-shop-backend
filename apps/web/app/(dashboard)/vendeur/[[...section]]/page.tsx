@@ -7,7 +7,6 @@ import {
   DeliveryPage,
   StatsPage,
   SettingsPage,
-  ProfilePage,
 } from "./seller-sections";
 
 export default async function VendeurDashboardPage({
@@ -26,7 +25,6 @@ export default async function VendeurDashboardPage({
     current === "livraison" ? <DeliveryPage /> :
     current === "statistiques" ? <StatsPage /> :
     current === "parametres" ? <SettingsPage /> :
-    current === "profil" ? <ProfilePage /> :
     <OverviewPage />;
 
   return (

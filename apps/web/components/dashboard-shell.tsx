@@ -39,7 +39,6 @@ const navItemsByRole: Record<Role, NavItem[]> = {
     { href: "/vendeur/livraison", icon: MapPin, label: "Zones livraison" },
     { href: "/vendeur/statistiques", icon: BarChart3, label: "Statistiques" },
     { href: "/vendeur/parametres", icon: Settings, label: "Paramètres" },
-    { href: "/vendeur/profil", icon: User, label: "Mon profil" },
   ],
   admin: [
     { href: "/admin", icon: LayoutDashboard, label: "Vue globale" },

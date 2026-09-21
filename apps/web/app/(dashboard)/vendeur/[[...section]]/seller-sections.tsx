@@ -1083,17 +1083,16 @@ export function StatsPage() {
   );
 }
 
-// ── Settings Page ──
+// ── Settings Page (profil + boutique + sécurité) ──
 
 export function SettingsPage() {
   const [user, setUser] = useState<{ fullName: string; phone: string; email: string | null; role: string; status: string } | null>(null);
   const [shop, setShop] = useState<{ name: string; description: string | null; phone: string | null; address: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
+  const [editingShop, setEditingShop] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Edit form state
   const [shopName, setShopName] = useState("");
   const [shopDesc, setShopDesc] = useState("");
   const [shopPhone, setShopPhone] = useState("");
@@ -1117,7 +1116,7 @@ export function SettingsPage() {
     }).finally(() => setLoading(false));
   }, []);
 
-  const handleSave = async () => {
+  const handleSaveShop = async () => {
     setSaving(true);
     setSaveError("");
     try {
@@ -1128,7 +1127,7 @@ export function SettingsPage() {
         address: shopAddress.trim() || undefined,
       });
       setShop(updated);
-      setEditing(false);
+      setEditingShop(false);
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : "Erreur lors de la sauvegarde");
     } finally {
@@ -1140,26 +1139,45 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Parametres" subtitle="Informations boutique, paiement et securite." />
+      <PageHeader title="Paramètres" subtitle="Votre profil, votre boutique et la sécurité du compte." />
+
+      {/* Profil personnel */}
+      <div className="mb-6 rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+        <div className="mb-4 flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#22A849] text-xl font-bold text-white">
+            {user?.fullName?.charAt(0).toUpperCase() ?? "?"}
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-[#1F2937]">{user?.fullName ?? "—"}</h2>
+            <p className="font-body text-sm text-[#6B7280]">{user?.phone ?? ""}{user?.email ? ` · ${user.email}` : ""}</p>
+          </div>
+          <span className={`ml-auto rounded-full px-3 py-1 text-xs font-bold ${user?.status === "ACTIVE" ? "bg-[#DCFCE7] text-[#15803D]" : "bg-[#FFF7ED] text-[#C2410C]"}`}>
+            {user?.status === "ACTIVE" ? "Actif" : user?.status === "PENDING" ? "En attente" : user?.status ?? "—"}
+          </span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <SettingBox icon={User} label="Nom complet" value={user?.fullName ?? "—"} />
+          <SettingBox icon={Store} label="Téléphone" value={user?.phone ?? "—"} />
+          <SettingBox icon={User} label="Email" value={user?.email ?? "Non renseigné"} />
+        </div>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+        {/* Boutique */}
         <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-bold text-[#1F2937]">Ma boutique</h2>
-            {!editing && (
-              <button
-                onClick={() => setEditing(true)}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border border-[#E5E7EB] px-3 text-xs font-bold text-[#1F2937] hover:border-[#22A849] hover:text-[#22A849]"
-              >
+            {!editingShop && (
+              <button onClick={() => setEditingShop(true)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border border-[#E5E7EB] px-3 text-xs font-bold text-[#1F2937] hover:border-[#22A849] hover:text-[#22A849]">
                 <Edit3 size={14} /> Modifier
               </button>
             )}
           </div>
 
-          {editing ? (
+          {editingShop ? (
             <div className="space-y-3">
-              {saveError && (
-                <div className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-600">{saveError}</div>
-              )}
+              {saveError && <div className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-600">{saveError}</div>}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[#6B7280]">Nom de la boutique</label>
                 <input value={shopName} onChange={(e) => setShopName(e.target.value)}
@@ -1183,11 +1201,11 @@ export function SettingsPage() {
                 </div>
               </div>
               <div className="flex gap-3 pt-1">
-                <button onClick={handleSave} disabled={saving}
+                <button onClick={handleSaveShop} disabled={saving}
                   className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] text-sm font-bold text-white disabled:opacity-60">
                   {saving ? <Loader2 size={15} className="animate-spin" /> : <><Edit3 size={14} /> Enregistrer</>}
                 </button>
-                <button onClick={() => { setEditing(false); setSaveError(""); }}
+                <button onClick={() => { setEditingShop(false); setSaveError(""); }}
                   className="inline-flex h-10 flex-1 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-sm font-semibold text-[#6B7280]">
                   Annuler
                 </button>
@@ -1197,9 +1215,6 @@ export function SettingsPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <SettingBox icon={Store} label="Nom boutique" value={shop?.name ?? user?.fullName ?? "—"} />
               <SettingBox icon={MapPin} label="Téléphone" value={shop?.phone ?? user?.phone ?? "—"} />
-              <SettingBox icon={User} label="Email" value={user?.email ?? "Non renseigné"} />
-              <SettingBox icon={ShieldCheck} label="Statut"
-                value={user?.status === "ACTIVE" ? "Compte actif" : user?.status === "PENDING" ? "En attente de validation" : user?.status ?? "—"} />
               {shop?.description && (
                 <div className="md:col-span-2 rounded-[14px] border border-[#F1F1F1] bg-[#FAFAFA] p-4">
                   <p className="font-body text-xs text-[#6B7280]">Description</p>
@@ -1216,70 +1231,7 @@ export function SettingsPage() {
           )}
         </div>
 
-        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-          <h2 className="mb-5 text-lg font-bold text-[#1F2937]">Sécurité</h2>
-          <ChangePasswordForm />
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ── Profile Page ──
-
-export function ProfilePage() {
-  const [user, setUser] = useState<{ fullName: string; phone: string; email: string | null; role: string; status: string } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-
-  useEffect(() => {
-    getMe()
-      .then((u) => setUser(u))
-      .catch(() => {
-        try {
-          const stored = localStorage.getItem("gg-user");
-          if (stored) setUser(JSON.parse(stored));
-        } catch {}
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <LoadingSkeleton />;
-
-  return (
-    <>
-      <PageHeader title="Mon profil" subtitle="Vos informations personnelles et securite du compte." />
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-          <div className="mb-5 flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#22A849] text-2xl font-bold text-white">
-              {user?.fullName?.charAt(0).toUpperCase() ?? "?"}
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-[#1F2937]">{user?.fullName ?? "—"}</h2>
-              <p className="font-body text-sm text-[#6B7280]">{user?.role === "SELLER" ? "Vendeur" : user?.role ?? "—"}</p>
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <SettingBox icon={User} label="Nom complet" value={user?.fullName ?? "—"} />
-            <SettingBox icon={Store} label="Téléphone" value={user?.phone ?? "—"} />
-            <SettingBox icon={User} label="Email" value={user?.email ?? "Non renseigné"} />
-            <SettingBox icon={ShieldCheck} label="Statut"
-              value={user?.status === "ACTIVE" ? "Compte actif" : user?.status === "PENDING" ? "En attente" : user?.status ?? "—"} />
-          </div>
-          {!editing && (
-            <button onClick={() => setEditing(true)}
-              className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#E5E7EB] px-4 text-sm font-bold text-[#1F2937] hover:border-[#22A849] hover:text-[#22A849]">
-              <Edit3 size={14} /> Modifier le profil
-            </button>
-          )}
-          {editing && (
-            <p className="mt-4 rounded-[10px] bg-[#FFF7ED] px-3 py-2 text-sm text-[#C2410C]">
-              La modification du profil sera disponible prochainement.
-            </p>
-          )}
-        </div>
-
+        {/* Sécurité */}
         <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
           <h2 className="mb-5 text-lg font-bold text-[#1F2937]">Changer le mot de passe</h2>
           <ChangePasswordForm />
