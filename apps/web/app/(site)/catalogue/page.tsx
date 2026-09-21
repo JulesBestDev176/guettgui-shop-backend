@@ -9,6 +9,19 @@ import {
 } from "lucide-react";
 import { listCategories, listProducts, toggleFavorite, checkFavorite } from "@/lib/api";
 import type { Category, Product, ProductListResponse } from "@/lib/types";
+import { CATEGORIES as LOCAL_CATEGORIES } from "@/lib/categories-data";
+
+// Fallback icons from local data when API doesn't provide iconUrl
+const ICON_BY_SLUG: Record<string, string> = Object.fromEntries(
+  LOCAL_CATEGORIES.flatMap((c) => [
+    [c.slug, c.icon],
+    ...(c.sub ?? []).map((s) => [s.slug, s.icon]),
+  ])
+);
+
+function catIcon(cat: Category): string | null {
+  return cat.iconUrl ?? ICON_BY_SLUG[cat.slug] ?? null;
+}
 
 const BADGE_COLORS: Record<string, string> = {
   Populaire: "bg-orange-100 text-orange-600",
@@ -411,8 +424,8 @@ export default function CataloguePage() {
                         onClick={() => updateParam("categoryId", cat.id)}
                         className="flex flex-col items-center gap-2 rounded-xl border border-border bg-white p-3 text-center transition-all hover:border-brand hover:shadow-sm"
                       >
-                        {cat.iconUrl ? (
-                          <img src={cat.iconUrl} alt={cat.name} className="h-10 w-10 object-contain" />
+                        {catIcon(cat) ? (
+                          <img src={catIcon(cat)!} alt={cat.name} className="h-10 w-10 object-contain" />
                         ) : (
                           <Tag size={28} className="text-brand/40" />
                         )}
