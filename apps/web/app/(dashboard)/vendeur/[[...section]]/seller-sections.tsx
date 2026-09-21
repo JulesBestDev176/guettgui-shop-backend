@@ -303,18 +303,18 @@ export function OverviewPage() {
           <h1 className="mt-1 text-xl font-extrabold tracking-[-0.3px] md:text-2xl">{userName}</h1>
 
           {/* Action buttons */}
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 grid grid-cols-3 gap-2">
             <Link href="/vendeur/produits"
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#22A849] px-4 text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors">
-              <Plus size={14} /> Ajouter produit
+              className="flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-[#22A849] text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors">
+              <Plus size={14} /> Ajouter
             </Link>
             <Link href="/vendeur/commandes"
-              className="inline-flex h-9 items-center rounded-[9px] border border-white/20 bg-white/10 px-4 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
+              className="flex h-9 items-center justify-center rounded-[9px] border border-white/20 bg-white/10 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
               Commandes
             </Link>
             <Link href="/vendeur/statistiques"
-              className="inline-flex h-9 items-center rounded-[9px] border border-white/20 bg-white/10 px-4 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
-              Statistiques
+              className="flex h-9 items-center justify-center rounded-[9px] border border-white/20 bg-white/10 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
+              Stats
             </Link>
           </div>
         </div>
