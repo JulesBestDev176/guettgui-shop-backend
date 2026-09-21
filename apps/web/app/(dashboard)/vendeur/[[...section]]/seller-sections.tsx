@@ -290,73 +290,82 @@ export function OverviewPage() {
   if (loading) return <LoadingSkeleton />;
 
   return (
-    <>
-      <section className="mb-6 grid gap-4 xl:grid-cols-[1.35fr_0.8fr]">
-        <div className="relative overflow-hidden rounded-[18px] bg-[#1F2937] p-6 text-white shadow-[0_12px_32px_rgba(31,41,55,.16)]">
-          <div className="absolute right-0 top-0 h-40 w-40 translate-x-12 -translate-y-12 rounded-full bg-[#22A849]/25" />
-          <div className="relative">
-            <p className="font-body text-sm text-[#9CA3AF]">Bienvenue</p>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-[-0.6px]">{userName}</h1>
-            <p className="font-body mt-2 max-w-xl text-sm leading-6 text-[#D1D5DB]">
-              Suivez vos ventes, preparez les commandes et gardez votre inventaire a jour.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-              <Link href="/vendeur/produits" className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#22A849] px-4 text-sm font-bold text-white sm:h-11 sm:px-5">
-                <Plus size={16} />
-                Ajouter produit
-              </Link>
-              <Link href="/vendeur/commandes" className="inline-flex h-10 items-center justify-center rounded-[10px] border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white sm:h-11 sm:px-5">
-                Commandes
-              </Link>
-              <Link href="/vendeur/statistiques" className="inline-flex h-10 items-center justify-center rounded-[10px] border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white sm:h-11 sm:px-5">
-                Statistiques
-              </Link>
+    <div className="space-y-4">
+
+      {/* ── Hero card ── */}
+      <div className="relative overflow-hidden rounded-[18px] bg-[#1F2937] p-5 text-white shadow-[0_8px_24px_rgba(31,41,55,.18)] md:p-6">
+        {/* Decorative blobs */}
+        <div className="pointer-events-none absolute -right-6 -top-6 h-36 w-36 rounded-full bg-[#22A849]/20" />
+        <div className="pointer-events-none absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-[#22A849]/10" />
+
+        <div className="relative">
+          <p className="font-body text-xs text-[#9CA3AF] uppercase tracking-wide">Tableau de bord</p>
+          <h1 className="mt-1 text-xl font-extrabold tracking-[-0.3px] md:text-2xl">{userName}</h1>
+
+          {/* Inline KPI row */}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
+              <p className="font-body text-[10px] text-[#9CA3AF]">CA total</p>
+              <p className="mt-0.5 text-base font-extrabold text-[#22A849]">
+                {dashboard ? `${(dashboard.revenueMonth / 1000).toFixed(0)}K F` : "—"}
+              </p>
+            </div>
+            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
+              <p className="font-body text-[10px] text-[#9CA3AF]">Commandes</p>
+              <p className="mt-0.5 text-base font-extrabold text-white">{dashboard?.ordersCount ?? 0}</p>
+            </div>
+            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
+              <p className="font-body text-[10px] text-[#9CA3AF]">Produits actifs</p>
+              <p className="mt-0.5 text-base font-extrabold text-white">{dashboard?.activeProducts ?? 0}</p>
+            </div>
+            <div className="rounded-[12px] bg-white/8 px-3 py-2.5">
+              <p className="font-body text-[10px] text-[#9CA3AF]">Stock total</p>
+              <p className="mt-0.5 text-base font-extrabold text-white">{products.length}</p>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+          {/* Action buttons */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/vendeur/produits"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#22A849] px-4 text-xs font-bold text-white hover:bg-[#1a9a3d] transition-colors">
+              <Plus size={14} /> Ajouter produit
+            </Link>
+            <Link href="/vendeur/commandes"
+              className="inline-flex h-9 items-center rounded-[9px] border border-white/20 bg-white/10 px-4 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
+              Commandes
+            </Link>
+            <Link href="/vendeur/statistiques"
+              className="inline-flex h-9 items-center rounded-[9px] border border-white/20 bg-white/10 px-4 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
+              Statistiques
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ── KPI cards ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="CA ce mois" value={dashboard ? `${Math.round(dashboard.revenueMonth / 1000)}K` : "0"} sub="FCFA" icon={Wallet} color="bg-[#F0FDF4] text-[#22A849]" />
+        <StatCard label="Commandes" value={String(dashboard?.ordersCount ?? 0)} sub="total" icon={ShoppingBag} color="bg-[#EFF6FF] text-[#2563EB]" />
+        <StatCard label="Produits actifs" value={String(dashboard?.activeProducts ?? 0)} sub={`/ ${products.length}`} icon={Package} color="bg-[#DCFCE7] text-[#15803D]" />
+        <StatCard label="Note moyenne" value={dashboard?.ratingAverage ? dashboard.ratingAverage.toFixed(1) : "—"} sub="/ 5" icon={Star} color="bg-[#FFF7ED] text-[#C2410C]" />
+      </div>
+
+      {/* ── Commandes récentes + Inventaire ── */}
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+
+        {/* Commandes récentes */}
+        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)] md:p-5">
           <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="font-body text-xs text-[#6B7280]">Resume</p>
-              <h2 className="font-bold text-[#1F2937]">Ce mois</h2>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="rounded-[14px] bg-[#FAFAFA] p-4">
-              <p className="font-body text-xs text-[#6B7280]">Chiffre d&apos;affaires</p>
-              <p className="mt-1 text-xl font-extrabold text-[#22A849]">{dashboard ? `${dashboard.revenueMonth.toLocaleString()} F` : "—"}</p>
-            </div>
-            <div className="rounded-[14px] bg-[#FAFAFA] p-4">
-              <p className="font-body text-xs text-[#6B7280]">Commandes</p>
-              <p className="mt-1 text-xl font-extrabold text-[#1F2937]">{dashboard?.ordersCount ?? 0}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Ventes ce mois" value={dashboard ? `${Math.round(dashboard.revenueMonth / 1000)}K` : "—"} sub="FCFA" icon={Wallet} color="bg-[#F0FDF4] text-[#22A849]" />
-        <StatCard label="Commandes" value={String(dashboard?.ordersCount ?? 0)} sub="ce mois" icon={ShoppingBag} color="bg-[#EFF6FF] text-[#2563EB]" />
-        <StatCard label="Produits actifs" value={String(dashboard?.activeProducts ?? 0)} sub={`sur ${products.length}`} icon={Package} color="bg-[#DCFCE7] text-[#15803D]" />
-        <StatCard label="Note moyenne" value={dashboard?.ratingAverage ? dashboard.ratingAverage.toFixed(1) : "—"} sub="avis" icon={Star} color="bg-[#FFF7ED] text-[#C2410C]" />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-bold text-[#1F2937]">Commandes récentes</h2>
-              <p className="font-body text-xs text-[#6B7280]">Demandes client et suivi preparation</p>
-            </div>
-            <Link href="/vendeur/commandes" className="text-xs font-bold text-[#22A849]">Voir tout</Link>
+            <h2 className="text-base font-bold text-[#1F2937] md:text-lg">Commandes récentes</h2>
+            <Link href="/vendeur/commandes" className="text-xs font-bold text-[#22A849] hover:underline">Voir tout</Link>
           </div>
           {recentOrders.length === 0 ? (
-            <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes de vos clients apparaitront ici." />
+            <EmptyState icon={ShoppingBag} title="Aucune commande" description="Les commandes apparaitront ici." />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center gap-3 rounded-[14px] bg-[#FAFAFA] p-3">
+                <Link key={order.id} href={`/vendeur/commandes/${order.id}`}
+                  className="flex items-center gap-3 rounded-[12px] bg-[#FAFAFA] p-3 hover:bg-[#F0FDF4] transition-colors">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-[#1F2937]">#{order.code}</p>
@@ -364,45 +373,46 @@ export function OverviewPage() {
                         {STATUS_LABELS[order.status] ?? order.status}
                       </span>
                     </div>
-                    <p className="font-body text-xs text-[#6B7280] truncate">{order.customerName}</p>
+                    <p className="font-body mt-0.5 text-xs text-[#6B7280] truncate">{order.customerName}</p>
                   </div>
                   <p className="text-sm font-bold text-[#22A849] shrink-0">{order.total.toLocaleString()} F</p>
-                </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
 
-        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-[#1F2937]">Inventaire</h2>
-              <p className="font-body text-xs text-[#6B7280]">Produits a surveiller</p>
-            </div>
-            <Link href="/vendeur/produits" className="text-xs font-bold text-[#22A849]">Gerer</Link>
+        {/* Inventaire rapide */}
+        <div className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,.04)] md:p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-bold text-[#1F2937] md:text-lg">Inventaire</h2>
+            <Link href="/vendeur/produits" className="text-xs font-bold text-[#22A849] hover:underline">Gérer</Link>
           </div>
           {products.length === 0 ? (
-            <EmptyState icon={Package} title="Aucun produit" description="Ajoutez votre premier produit pour commencer." />
+            <EmptyState icon={Package} title="Aucun produit" description="Ajoutez votre premier produit." />
           ) : (
-            <div className="space-y-3">
-              {products.slice(0, 4).map((product) => {
+            <div className="space-y-2">
+              {products.slice(0, 5).map((product) => {
                 const image = product.images?.[0]?.url ?? "/placeholder-product.jpg";
+                const rupture = product.stock === 0;
                 return (
-                  <div key={product.id} className="flex items-center gap-3 rounded-[14px] bg-[#FAFAFA] p-3">
-                    <img src={image} alt={product.name} className="h-12 w-12 rounded-[10px] object-cover" />
+                  <div key={product.id} className="flex items-center gap-3 rounded-[12px] bg-[#FAFAFA] p-2.5">
+                    <img src={image} alt={product.name} className="h-10 w-10 shrink-0 rounded-[8px] object-cover" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-[#1F2937]">{product.name}</p>
-                      <p className="font-body text-xs text-[#6B7280]">{product.stock > 0 ? `${product.stock} disponibles` : "Rupture de stock"}</p>
+                      <p className={`font-body text-xs ${rupture ? "text-red-500" : "text-[#6B7280]"}`}>
+                        {rupture ? "Rupture" : `${product.stock} en stock`}
+                      </p>
                     </div>
-                    <p className="text-sm font-bold text-[#22A849]">{product.basePrice.toLocaleString()} F</p>
+                    <p className="text-xs font-bold text-[#22A849] shrink-0">{product.basePrice.toLocaleString()} F</p>
                   </div>
                 );
               })}
             </div>
           )}
         </div>
-      </section>
-    </>
+      </div>
+    </div>
   );
 }
 
