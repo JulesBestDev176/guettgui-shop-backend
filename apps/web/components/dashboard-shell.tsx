@@ -150,7 +150,7 @@ export function DashboardShell({
   );
 
   const userBlock = (
-    <div className="border-t border-white/8 p-4 space-y-3">
+    <div className="border-t border-white/8 p-4">
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#22A849] text-xs font-bold text-white">
           {initials}
@@ -168,13 +168,6 @@ export function DashboardShell({
           <LogOut size={15} />
         </button>
       </div>
-      <button
-        onClick={handleLogout}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[#64748B] hover:bg-white/5 hover:text-white transition-colors"
-      >
-        <LogOut size={13} />
-        Se déconnecter
-      </button>
     </div>
   );
 
